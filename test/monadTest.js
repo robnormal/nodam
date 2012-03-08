@@ -1,3 +1,5 @@
+/*jshint node: true */
+
 var _ = require('../lib/curry.js');
 var mb = require('../lib/Maybe.js');
 var M = require('../lib/AsyncMonad.js');
@@ -36,7 +38,12 @@ WriterMonad.result = function(x) {
 	return new WriterMonad([x, '']);
 };
 
+var path1 = __dirname + '/fixtures/monadTest.txt';
+var path2 = __dirname + '/fixtures/monadTest2.txt';
+var path3 = __dirname + '/fixtures/monadTest3.txt';
+
 module.exports = {
+	/*
 	'Monads can pipe, etc.': function(beforeExit, assert) {
 		var w = new WriterMonad([3, 'I am three']);
 
@@ -123,20 +130,18 @@ module.exports = {
 	},
 
 	'readFile monadically reads files': function(beforeExit, assert) {
-		var path = __dirname + '/fixtures/monadTest.txt';
-
 		// counter to ensure our callbacks get called
 		var count = 0;
 
-		mfs.readFile(path, 'ascii') .pipe(function(x) {
-			var y = require('fs').readFileSync(path, 'ascii');
+		mfs.readFile(path1, 'ascii') .pipe(function(x) {
+			var y = require('fs').readFileSync(path1, 'ascii');
 			assert.equal(x, y);
 
 			count++;
 
 			return M.AsyncMonad.result(x.length);
 		}).pipe(function(len) {
-			var y = require('fs').readFileSync(path, 'ascii');
+			var y = require('fs').readFileSync(path1, 'ascii');
 			assert.equal(len, y.length);
 
 			count++;
@@ -178,7 +183,6 @@ module.exports = {
 
 	'onErr overrides failure callback': function(beforeExit, assert) {
 		var 
-			path = __dirname + '/fixtures/monadTest.txt',
 			nonexistent = __dirname + '/fixtures/NON-EXISTENT',
 			count = 0,
 			bad_count = 0,
@@ -207,7 +211,7 @@ module.exports = {
 		}).onErr(overrideErr).run(_.identity, wrongErr);
 
 		// or afterward
-		mfs.readFile(path, 'ascii') .pipe(function(x) {
+		mfs.readFile(path1, 'ascii') .pipe(function(x) {
 			// this SHOULD run
 			good_count++;
 
@@ -229,9 +233,7 @@ module.exports = {
 	},
 
 	'combine() runs multiple async requests in parallel': function(beforeExit, assert) {
-		var path1 = __dirname + '/fixtures/monadTest.txt',
-			path2 = __dirname + '/fixtures/monadTest2.txt',
-
+		var 
 			text1 = fs.readFileSync(path1, 'ascii'),
 			text2 = fs.readFileSync(path2, 'ascii'),
 
@@ -265,7 +267,7 @@ module.exports = {
 	},
 
 	'AsyncMonad catches errors arising in combine() actions': function(beforeExit, assert) {
-		var path1 = __dirname + '/fixtures/monadTest.txt',
+		var
 			nonexistent = __dirname + '/fixtures/NON-EXISTENT',
 			override_count = 0,
 			bad_count = 0;
@@ -458,6 +460,64 @@ module.exports = {
 			// timer does not always line up precisely and there appears
 			// to be a rounding error on some systems
 			assert.ok(time2 >= time1 + 99, 'timeout worked');
+		});
+	},
+*/
+
+	'lift() turns a non-monadic function into a monadic one': function(beforeExit, assert) {
+		// join array of lines into string
+		var unlines = _.method('join', "\n");
+		var unlinesM = M.liftM(unlines);
+
+		var reads = M.combine([
+			M.fs().readFile(path1, 'ascii'),
+			M.fs().readFile(path2, 'ascii')
+		]).pipe(function(files) {
+			console.log('Got files');
+			return M.result(files);
+		});
+
+		var text1, text2;
+		var joinRead1 =	reads .pipe(
+			function(lines) {
+				console.log('running 1');
+				text1 = lines;
+				return M.result(unlines(lines));
+			}
+		) .pipe(
+			function(x) {
+				return M.result(x);
+			}
+		);
+
+		console.log(_.describeFunction(joinRead1.x));
+
+		joinRead1.run(function(s) {
+			console.log(s);
+			text1 = s;
+		}, function(e) {
+			console.log(e);
+		});
+
+		var joinRead2 =	unlinesM(reads) .pipe(
+			function(x) {
+				return M.result(x);
+			}
+		);
+
+		joinRead2.run(function(s) {
+			console.log('ran 2');
+			text2 = s;
+		}, function(e) {
+			console.log(e);
+		});
+
+		beforeExit(function() {
+			/*
+			assert.ok(text1);
+			assert.ok(text2);
+			assert.equal(text1, text2);
+			*/
 		});
 	},
 
