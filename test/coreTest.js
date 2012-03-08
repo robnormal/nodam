@@ -11,31 +11,54 @@ function doesntThrow(assert, f, err) {
 	}
 }
 
-function display(f) {
-	try {
-		f();
-	} catch(e) {
-		console.log(e);
-		throw e;
-	}
-}
-
 module.exports = {
-	'recurse allows you to implement recursion as a loop': function(_, assert) {
-		var sum = (function() {
-			var loop = $.recurse(function(x, i, arr) {
-				return i < 0 ?
-					$.recurse.result(x) :
-					[x + arr[i], i-1, arr];
+	'recurse allows you to implement recursion as a loop, ie tail-call recursion': function(_, assert) {
+
+		var optimizedSum = (function(){
+
+			// sums the first n elements of xs, add to sum
+			var loop = $.recurse(function(xs, n, sum) {
+				return n <= 0 || !xs || xs.length == 0 ?
+					sum :
+					$.recurse.args([xs, n - 1, sum + xs[n-1]]);
 			});
 
-			return function(arr) {
-				return loop(0, arr.length - 1, arr);
+			// sum all elements
+			return function(xs) {
+				return loop(xs, xs.length, 0);
 			};
 		})();
-		
-		assert.equal(sum([1, 4, 8]), 13);
+
+		var unoptimizedSum = (function() {
+			var loop = function(xs, n, sum) {
+				return n <= 0 || !xs || xs.length == 0 ?
+					sum :
+					loop(xs, n - 1, sum + xs[n-1]);
+			};
+
+			return function(xs) {
+				return loop(xs, xs.length, 0);
+			};
+		})();
+
+		assert.equal(optimizedSum([1, 4, 8]), 13);
+		assert.equal(unoptimizedSum([1, 4, 8]), 13);
+
+		// now sum a big array
+		var $arr = [];
+		for (var i = 100000; i > 0; i--) {
+			$arr.push(i);
+		}
+
+		assert.throws(function() {
+			unoptimizedSum($arr);
+		}, RangeError, 'unoptimizedSum broke the stack');
+
+		doesntThrow(assert, function() {
+			optimizedSum($arr);
+		}, RangeError, 'unoptimizedSum broke the stack');
 	},
+
 	'curryThis does what it says': function(_, assert) {
 		var f = function(x, y) {
 			return x.a + y;

@@ -161,6 +161,7 @@ AsyncMonad.callCC = function(f) {
 };
 
 var arrayOfAsync = arrayOf(AsyncMonad);
+
 AsyncMonad.combine = function(monads) {
 	if (! arrayOfAsync(monads)) {
 		throw new Error('AsyncMonad.combine() requires an array of AsyncMonad objects');
@@ -277,6 +278,7 @@ var errorPassingToAsyncMonad = asyncMonadConverter(function(success, failure) {
 	};
 });
 
+
 // Can also be used for object methods
 // usage: serverListen(server, host, port)
 var serverListen = methodToAsyncMonad('listen');
@@ -332,59 +334,6 @@ function dns() {
 	return asyncDns;
 }
 
-/** STATE MONAD - not where this fits in yet **/
-function StateReturn(value, state) {
-	this.value = value;
-	this.state = state;
-}
-
-function StateMonad(stateful_callback) {
-	this.x = stateful_callback;
-}
-
-_.extend(StateMonad.prototype, Monad, {
-	doBind: function(f) {
-		var self = this;
-
-		var s_func = function (state) {
-			if (undefined === state) {
-				throw new Error('State may not be undefined.' + '\n' +
-					(new Error()).stack
-				);
-			} else {
-				var prev_step = self.x(state);
-				return f(prev_step.value).x(prev_step.state);
-			}
-		};
-
-		return new StateMonad(s_func);
-	},
-
-	onErr: function (the_catch) {
-		var self = this;
-
-		return new StateMonad(function(state) {
-			try {
-				return this.x(state);
-			} catch(err) {
-				return the_catch(err, m.x, state);
-			}
-		});
-	},
-
-	run: function (state) {
-		return this.x(state);
-	}
-});
-
-StateMonad.result = function (x) {
-	// returns state function (wrapped in StateMonad)
-	// that does nothing but return x as its primary value
-	return new StateMonad(function (state) {
-		return new StateReturn(x, state);
-	});
-};
-
 // Make Maybe into a monad, so we can chain functions
 // without checking for "nothing" every time
 _.extend(M.Maybe.prototype, Monad, {
@@ -404,10 +353,10 @@ module.exports = {
 	sequence: sequence,
 	AsyncMonad: AsyncMonad,
 	toAsyncMonad: toAsyncMonad,
+	methodToAsyncMonad: methodToAsyncMonad,
+	errorPassingToAsyncMonad: errorPassingToAsyncMonad,
 	combine: AsyncMonad.combine,
 	result: AsyncMonad.result,
-	StateReturn: StateReturn,
-	StateMonad: StateMonad,
 	setTimeout: mySetTimeout,
 	nextTick: nextTick,
 	log: log,

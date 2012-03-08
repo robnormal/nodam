@@ -1,38 +1,37 @@
 var __slice = Array.prototype.slice;
-var and, or, sum;
+var and, or, sum, fmap;
 
 var _ = require('underscore');
 
+/* Stack-free recursion
+ *
+ * This will call your function in a loop. If the return value is an
+ * instance of Recurse, the "args" attribute (an array) will be used
+ * as the arguments to your function in the next loop. Otherwise,
+ * the value is returned.
+ */
 var recurse;
 (function() {
-	function Result(x) {
-		this.x = x;
+	function Recurse(args) {
+		this.args = args;
 	}
 
 	recurse = function(f) {
 		return function() {
-			var result = arguments;
+			var result = new Recurse(arguments);
 
 			do {
-				result = f.apply(null, result);
-			} while (!(result instanceof Result));
+				result = f.apply(null, result.args);
+			} while (result instanceof Recurse);
 
-			return result.x;
+			return result;
 		}
 	};
 
-	recurse.result = function(x) {
-		return new Result(x);
+	recurse.args = function(args) {
+		return new Recurse(args);
 	};
 })();
-
-function throwIf(cond, msg) {
-	if (cond) throw new Error(msg);
-}
-
-function throwUnless(cond, msg) {
-	throwIf(!cond, msg);
-}
 
 function forOwn(obj, f) {
 	for (var k in obj) {
@@ -72,6 +71,14 @@ function curryThis(f) {
 	};
 }
 
+/* Object-method version of "curry".  Returns a function that
+ * calls the given method on its first argument, passing the given
+ * arguments to it. Ex:
+ *
+ * responseType = method('setHeader', 'Content-Type');
+ * // ...
+ * responseType(server.response, 'text/html');
+ */
 function method(method /*, args */) {
 	var args;
 	if (arguments.length > 1) {
@@ -90,27 +97,6 @@ function method(method /*, args */) {
 }
 
 
-/* Stack-free recursion
-**
-** This will call your function in a loop, passing the 'recurse' attribute
-** of your return value to the next call. If there is no such attribute,
-** it returns your return value
-*/
-/*
-function recurse(f) {
-	return function() {
-		var result, args = arguments;
-
-		do {
-			result = f.apply(null, args);
-			args = result.recurse;
-		} while (args);
-
-		return result;
-	};
-}
-*/
-
 /* Returns function that takes it's first two arguments
  * in reverse order
  */
@@ -125,7 +111,7 @@ function flip(f) {
 	};
 }
 
-/* Reorders arguments to _.reduce, to make it more 
+/* Reorders arguments to _.reduce, to make it more
  * functional-friendly
  */
 function fold(f, memo, list) {
@@ -220,8 +206,6 @@ module.exports = _.extend( {
 	curryThis: curryThis,
 	method: method,
 	recurse: recurse,
-	throwIf: throwIf,
-	throwUnless: throwUnless,
 	forOwn: forOwn,
 	forOwnKeys: forOwnKeys,
 	forArgs: forArgs,
