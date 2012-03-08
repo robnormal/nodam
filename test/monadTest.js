@@ -1,6 +1,6 @@
-var _ = require('../curry.js');
-var mb = require('../Maybe.js');
-var M = require('../AsyncMonad.js');
+var _ = require('../lib/curry.js');
+var mb = require('../lib/Maybe.js');
+var M = require('../lib/AsyncMonad.js');
 
 var mfs = M.fs();
 var fs = require('fs');

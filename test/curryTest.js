@@ -1,5 +1,5 @@
-var $ = require('../curry.js');
-var M = require('../Maybe.js');
+var $ = require('../lib/curry.js');
+var M = require('../lib/Maybe.js');
 
 function doesntThrow(assert, f, err) {
 	try {
