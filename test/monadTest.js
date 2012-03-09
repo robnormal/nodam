@@ -473,14 +473,13 @@ module.exports = {
 			M.fs().readFile(path1, 'ascii'),
 			M.fs().readFile(path2, 'ascii')
 		]).pipe(function(files) {
-			console.log('Got files');
 			return M.result(files);
 		});
 
 		var text1, text2;
+
 		var joinRead1 =	reads .pipe(
 			function(lines) {
-				console.log('running 1');
 				text1 = lines;
 				return M.result(unlines(lines));
 			}
@@ -490,34 +489,28 @@ module.exports = {
 			}
 		);
 
-		console.log(_.describeFunction(joinRead1.x));
-
-		joinRead1.run(function(s) {
-			console.log(s);
-			text1 = s;
-		}, function(e) {
-			console.log(e);
-		});
-
 		var joinRead2 =	unlinesM(reads) .pipe(
 			function(x) {
 				return M.result(x);
 			}
 		);
 
+		joinRead1.run(function(s) {
+			text1 = s;
+		}, function(e) {
+			console.log(e);
+		});
+
 		joinRead2.run(function(s) {
-			console.log('ran 2');
 			text2 = s;
 		}, function(e) {
 			console.log(e);
 		});
 
 		beforeExit(function() {
-			/*
 			assert.ok(text1);
 			assert.ok(text2);
 			assert.equal(text1, text2);
-			*/
 		});
 	},
 
