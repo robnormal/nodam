@@ -12,15 +12,15 @@ function doesntThrow(assert, f, err) {
 }
 
 module.exports = {
-	'recurse allows you to implement recursion as a loop, ie tail-call recursion': function(_, assert) {
+	'recursive allows you to implement recursion as a loop, ie tail-call recursion': function(_, assert) {
 
 		var optimizedSum = (function(){
 
 			// sums the first n elements of xs, add to sum
-			var loop = $.recurse(function(xs, n, sum) {
+			var loop = $.recursive(function(xs, n, sum) {
 				return n <= 0 || !xs || xs.length == 0 ?
 					sum :
-					$.recurse.args([xs, n - 1, sum + xs[n-1]]);
+					$.recurse([xs, n - 1, sum + xs[n-1]]);
 			});
 
 			// sum all elements
@@ -57,6 +57,29 @@ module.exports = {
 		doesntThrow(assert, function() {
 			optimizedSum($arr);
 		}, RangeError, 'unoptimizedSum broke the stack');
+
+		// 3x+1 problem, in mutual-recursion form
+		var mutualA, mutualB;
+		mutualA = $.recursive(function(x, steps) {
+			return $.recurse([x, (steps) + 1], mutualB);
+		});
+		mutualB = $.recursive(function(x, steps) {
+			if (x == 1) {
+				return steps;
+			} else {
+				if (x % 2 == 0) {
+					return $.recurse([x / 2, steps], mutualA);
+				} else {
+					return $.recurse([(3*x + 1) / 2, steps], mutualA);
+				}
+			}
+		});
+		var collatz = function(x) { return mutualA(x, 0); };
+
+		doesntThrow(assert, function() {
+			assert.equal(collatz(4), 3);
+			assert.equal(collatz(5), 5);
+		});
 	},
 
 	'curryThis does what it says': function(_, assert) {
