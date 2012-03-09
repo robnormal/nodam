@@ -21,6 +21,7 @@ function getTime() {
 	return (new Date()).getTime();
 }
 
+// for testing generic Monad functionality
 function WriterMonad(x) {
 	this.x = x;
 }
@@ -43,7 +44,6 @@ var path2 = __dirname + '/fixtures/monadTest2.txt';
 var path3 = __dirname + '/fixtures/monadTest3.txt';
 
 module.exports = {
-	/*
 	'Monads can pipe, etc.': function(beforeExit, assert) {
 		var w = new WriterMonad([3, 'I am three']);
 
@@ -462,7 +462,6 @@ module.exports = {
 			assert.ok(time2 >= time1 + 99, 'timeout worked');
 		});
 	},
-*/
 
 	'lift() turns a non-monadic function into a monadic one': function(beforeExit, assert) {
 		// join array of lines into string
