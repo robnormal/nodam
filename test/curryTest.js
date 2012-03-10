@@ -112,6 +112,18 @@ module.exports = {
 
 		assert.ok(M.just(4).isJust());
 		assert.ok(! M.just(4).isNothing());
+	},
+
+	'Stack is a single-linked list': function(_, assert) {
+		var s = new $.Stack();
+
+		for (var i = 0; i < 10; i++) {
+			s = s.push(i);
+		}
+
+		var sflat = s.flatten();
+
+		assert.deepEqual(sflat, $.range(0, 10));
 	}
 
 };
