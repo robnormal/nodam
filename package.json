@@ -1,0 +1,10 @@
+{
+	"name": "nodam",
+	"version": "0.1.0",
+	"author": "Rob Rosenbaum <rob@robrosenbaum.com>",
+	"description": "Node.js Asynchronous Monad: Control flow made easy",
+	"keywords": ["functional", "monad", "continuation", "server"],
+	"repository": { "type": "git", "url": "git://github.com/robnormal/nodam.git" },
+	"dependencies"  : { "underscore": "" },
+	"license": "MIT"
+}
