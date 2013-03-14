@@ -118,16 +118,16 @@ http.createServer(function(request, response) {
         response.end(cleaned_page)
       ]);
     })
-    
+
     // log any errors
     .onErr(logPageErrorsM)
 
-		// then() - for when you don't care what you just did
-		.then(
-			fsM.open(hitTally, 'a', 'ascii') .pipe(function(handle) {
-				return fsM.write(handle, '1');
-			})
-		)
+    // then() - for when you don't care what you just did
+    .then(
+        fsM.open(hitTally, 'a', 'ascii') .pipe(function(handle) {
+            return fsM.write(handle, '1');
+        })
+    )
 
     // Let's go!
     // Don't need to do anything on success,

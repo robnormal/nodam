@@ -2,7 +2,7 @@
 
 var _ = require('../lib/curry.js');
 var mb = require('../lib/Maybe.js');
-var M = require('../lib/AsyncMonad.js');
+var M = require('../lib/nodam.js');
 
 var mfs = M.fs();
 var fs = require('fs');
@@ -42,6 +42,10 @@ WriterMonad.result = function(x) {
 var path1 = __dirname + '/fixtures/monadTest.txt';
 var path2 = __dirname + '/fixtures/monadTest2.txt';
 var path3 = __dirname + '/fixtures/monadTest3.txt';
+
+function monadErr(err) {
+	throw new Error('Monad error: ' + err);
+}
 
 module.exports = {
 	'Monads can pipe, etc.': function(beforeExit, assert) {
@@ -332,7 +336,7 @@ module.exports = {
 			getMonad2 = function(str) {
 				// repeat next text as many times as there are characters
 				// in this text
-				repeat_text = _.curry(_.repeat, str.length);
+				var repeat_text = _.curry(_.repeat, str.length);
 				return mfs.readFile(path2).mmap(repeat_text).mmap(_.method('join'));
 			},
 			m1, m2
@@ -449,9 +453,7 @@ module.exports = {
 
 				time2 = t;
 
-			}, function(err) {
-				throw new Error('Monad error: ' + err);
-			});
+			}, monadErr);
 
 		beforeExit(function() {
 			assert.ok(time1 && time2, 'monadic action was run');
@@ -526,6 +528,102 @@ module.exports = {
 
 		assert.ok(x.isJust());
 		assert.equal(x.fromJust(), 8);
+	},
+
+	'AsyncMonad is also a reader monad': function(b, assert) {
+		var monad = M;
+
+		monad
+			.result(getTime())
+			.pipe(function(t) {
+
+				return M.result();
+			}) .get('me') .pipe(function(me) {
+
+				return M.result(me);
+
+			}) .run(function(me, s) {
+
+				assert.equal(me, 'you');
+
+			}, monadErr, {me: 'you'});
+
+		var m1 = M.result(1);
+		var m2 = M.result(2);
+		var m3 = M.result(3);
+
+		/*
+		M.sequence([m1, m2, m3]).run(function(result, s) {
+			assert.equal(s && s.be, 'closing', 'sequence preserves state');
+		}, monadErr, { be: 'closing' });
+		*/
+	}, 
+
+	'AsyncMonad is also a state monad': function(b, assert) {
+		var
+			monad = M,
+			state = {me: 'you'},
+			m = monad.result(getTime())
+				.get('me')
+				.pipe(function(me) {
+
+					assert.equal(me, 'you');
+
+					return M.result();
+				}),
+
+			mm = m .set('me', 'bob').pipe( function(me) {
+				assert.equal(me, 'bob');
+				return M.result();
+			}) .get('me') .pipe(function(me) {
+
+				assert.equal(me, 'bob');
+
+				return M.result();
+			}) .get('me') .pipe(function(me) {
+
+				assert.equal(me, 'bob');
+
+				return M.result();
+			});
+	
+		mm.run(_.inert, monadErr, state);
+		m.run(_.inert, monadErr, state);
+		mm.run(_.inert, monadErr, state);
+		m.run(_.inert, monadErr, state);
+	}, 
+
+
+	'sequence_ combines a list of monads with then()': function(b, assert) {
+		var a,b,c, ma, mb, mc, m;
+
+		ma = M.result(1).mmap(function(n) { a = n; });
+		mb = M.result(2).mmap(function(n) { b = n; });
+		mc = M.result(3).mmap(function(n) { c = n; });
+
+		M.sequence_([ma, mb, mc]).run(_.inert, function(err) {
+			throw new Error('Monad error: ' + err);
+		});
+
+		assert.equal(a, 1);
+		assert.equal(b, 2);
+		assert.equal(c, 3);
+	},
+
+	'sequence is like sequence_, but returns the values of the monads': function(b, assert) {
+		var ma, mb, mc, m;
+
+		ma = M.result(1);
+		mb = M.result(2);
+		mc = M.result(3);
+
+		M.sequence([ma, mb, mc]).mmap(function(xs) {
+			assert.equal(xs[0], 1);
+			assert.equal(xs[1], 2);
+			assert.equal(xs[2], 3);
+		}).run(_.inert, function(err) {
+			throw new Error('Monad error: ' + err);
+		});
 	}
 };
 

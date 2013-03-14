@@ -1,3 +1,5 @@
+/*jshint node: true */
+
 var $ = require('../lib/curry.js');
 var M = require('../lib/Maybe.js');
 
@@ -18,7 +20,7 @@ module.exports = {
 
 			// sums the first n elements of xs, add to sum
 			var loop = $.recursive(function(xs, n, sum) {
-				return n <= 0 || !xs || xs.length == 0 ?
+				return n <= 0 || !xs || xs.length === 0 ?
 					sum :
 					$.recurse([xs, n - 1, sum + xs[n-1]]);
 			});
@@ -31,7 +33,7 @@ module.exports = {
 
 		var unoptimizedSum = (function() {
 			var loop = function(xs, n, sum) {
-				return n <= 0 || !xs || xs.length == 0 ?
+				return n <= 0 || !xs || xs.length === 0 ?
 					sum :
 					loop(xs, n - 1, sum + xs[n-1]);
 			};
@@ -64,10 +66,10 @@ module.exports = {
 			return $.recurse([x, (steps) + 1], mutualB);
 		});
 		mutualB = $.recursive(function(x, steps) {
-			if (x == 1) {
+			if (x === 1) {
 				return steps;
 			} else {
-				if (x % 2 == 0) {
+				if (x % 2 === 0) {
 					return $.recurse([x / 2, steps], mutualA);
 				} else {
 					return $.recurse([(3*x + 1) / 2, steps], mutualA);
@@ -87,7 +89,7 @@ module.exports = {
 			return x.a + y;
 		};
 
-		obj = { a: 3 };
+		var obj = { a: 3 };
 		obj.add = $.curryThis(f);
 
 		assert.equal(obj.add(2), 5);
@@ -104,6 +106,31 @@ module.exports = {
 		var i8n = $.method('replace', /english/);
 		assert.equal(i8n('I speak english', 'deutsch'), 'I speak deutsch',
 			'allows extra arguments when called');
+	},
+
+	'compose() composes functions': function(_, assert) {
+		var
+			s = 'Abraham Lincoln',
+
+			f = function(x) { return x.toString().split(' ')[0] },
+			g = function(x) {
+				// WTF? without using toString(), I get an error on split.
+				return x.toString().split('').reverse().join('');
+			};
+
+		assert.equal(f(g(s)), $.compose(f, g)(s));
+	},
+
+	'mapArgs(f, g) is passes the output of g as the arguments to f': function(_, assert) {
+		var
+			a = 'the',
+			b = 'happy',
+			c = 'ax',
+
+			f = function(x, y, z) { return x.length * y.length + z.length }; // f(a,b,c) = 17
+			h = function(args) { return [args[0] + args[1], args[2], ''] }; // now 8 * 2 + 0 = 16
+
+		assert.equal(f.apply(void 0, h([a, b, c])), $.mapArgs(f, h)(a, b, c));
 	},
 
 	'Maybe works as expected': function(_, assert) {
