@@ -43,8 +43,10 @@ var path1 = __dirname + '/fixtures/monadTest.txt';
 var path2 = __dirname + '/fixtures/monadTest2.txt';
 var path3 = __dirname + '/fixtures/monadTest3.txt';
 
-function monadErr(err) {
-	throw new Error('Monad error: ' + err);
+function monadErr(assert, msg) {
+	return function(err) {
+		assert.ok(false, msg || ('Monad error: ' + err));
+	};
 }
 
 module.exports = {
@@ -453,7 +455,7 @@ module.exports = {
 
 				time2 = t;
 
-			}, monadErr);
+			}, monadErr(assert));
 
 		beforeExit(function() {
 			assert.ok(time1 && time2, 'monadic action was run');
@@ -546,7 +548,7 @@ module.exports = {
 
 				assert.equal(me, 'you');
 
-			}, monadErr, {me: 'you'});
+			}, monadErr(assert), {me: 'you'});
 
 		var m1 = M.result(1);
 		var m2 = M.result(2);
@@ -555,7 +557,7 @@ module.exports = {
 		/*
 		M.sequence([m1, m2, m3]).run(function(result, s) {
 			assert.equal(s && s.be, 'closing', 'sequence preserves state');
-		}, monadErr, { be: 'closing' });
+		}, monadErr(assert), { be: 'closing' });
 		*/
 	}, 
 
@@ -587,12 +589,31 @@ module.exports = {
 				return M.result();
 			});
 	
-		mm.run(_.inert, monadErr, state);
-		m.run(_.inert, monadErr, state);
-		mm.run(_.inert, monadErr, state);
-		m.run(_.inert, monadErr, state);
+		mm.run(_.inert, monadErr(assert), state);
+		m.run(_.inert, monadErr(assert), state);
+		mm.run(_.inert, monadErr(assert), state);
+		m.run(_.inert, monadErr(assert), state);
 	}, 
 
+	'combine() preserves state': function(beforeExit, assert) {
+		var 
+			text1 = fs.readFileSync(path1, 'ascii'),
+			text2 = fs.readFileSync(path2, 'ascii'),
+
+			count = 0,
+			m1 = mfs.readFile(path1, 'ascii'),
+			m2 = mfs.readFile(path2, 'ascii'),
+			m = M.AsyncMonad .combine([m1, m2]);
+		
+		m.run(function(x, state) {
+			assert.equal(state && state.foo, 'bar');
+			count++;
+		}, monadErr(assert), { foo: 'bar' } );
+
+		beforeExit(function() {
+			assert.equal(count, 1);
+		});
+	},
 
 	'sequence_ combines a list of monads with then()': function(b, assert) {
 		var a,b,c, ma, mb, mc, m;
@@ -623,6 +644,38 @@ module.exports = {
 			assert.equal(xs[2], 3);
 		}).run(_.inert, function(err) {
 			throw new Error('Monad error: ' + err);
+		});
+	},
+
+	'Bad function calls generate helpful error information': function(beforeExit, assert) {
+		var count = 0;
+		var bad_count = 0;
+
+		function myErr(err) {
+			count++;
+
+			assert.ok(err.monad);
+			if (err.monad) {
+				assert.ok(err.monad.arguments);
+				assert.equal(err.monad.library, 'fs');
+				assert.equal(err.monad.callback, 'readFile');
+			}
+		}
+
+		// should send error to myErr...
+		mfs.readFile({ not_a: 'string' }).run(_.identity, myErr);
+
+		// even if it's piped first
+		mfs.readFile({ not_a: 'string' }, 'ascii') .pipe(function(x) {
+			// this should not run
+			bad_count++;
+
+			return M.AsyncMonad.result(x.length);
+		}).run(_.identity, myErr);
+
+		beforeExit(function() {
+			assert.equal(count, 2);
+			assert.equal(bad_count, 0);
 		});
 	}
 };
