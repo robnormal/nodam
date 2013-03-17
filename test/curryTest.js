@@ -121,6 +121,12 @@ module.exports = {
 		});
 	},
 
+	'methodOf() allows an object\'s method to be called separate from it': function(before, assert) {
+		var myReplace = $.methodOf('curses, foiled again', 'replace');
+
+		assert.equal(myReplace(/curses/, 'kisses'), 'kisses, foiled again');
+	},
+
 	'compose() composes functions': function(_, assert) {
 		var
 			s = 'Abraham Lincoln',
