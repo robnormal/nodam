@@ -127,7 +127,7 @@ module.exports = {
 			b = 'happy',
 			c = 'ax',
 
-			f = function(x, y, z) { return x.length * y.length + z.length }; // f(a,b,c) = 17
+			f = function(x, y, z) { return x.length * y.length + z.length }, // f(a,b,c) = 17
 			h = function(args) { return [args[0] + args[1], args[2], ''] }; // now 8 * 2 + 0 = 16
 
 		assert.equal(f.apply(void 0, h([a, b, c])), $.mapArgs(f, h)(a, b, c));
@@ -151,7 +151,72 @@ module.exports = {
 		var sflat = s.flatten();
 
 		assert.deepEqual(sflat, $.range(0, 10));
-	}
+	},
 
+	'debug() turns debugging on': function(_, assert) {
+		assert.equal($.debugging(), false);
+
+		$.debug(true);
+		assert.ok($.debugging());
+
+		// clean up
+		$.debug(false);
+	},
+
+	'creationStack adds a creationStack to a function if debugging is on': function(_, assert) {
+		var f = function() {};
+
+		$.creationStack(f);
+		assert.equal(f._creation_stack, undefined, 'does nothing when debugging is off');
+
+		$.debug(true);
+		$.creationStack(f);
+
+		assert.ok(f._creation_stack, 'adds _creation_stack');
+		$.debug(false);
+	},
+
+	'madeAt returns origin from creationStack': function(_, assert) {
+		var f = function() {};
+
+		$.debug(true);
+		$.creationStack(f);
+
+		assert.ok($.madeAt(f).match(__filename),
+			'madeAt returns proper filename (and, we hope, line number)'
+		);
+		$.debug(false);
+	},
+
+	'creationStack adds _maker property': function(_, assert) {
+		$.debug(true);
+
+		function createPred() {
+			return $.creationStack(function(x) { return x - 1 });
+		}
+
+		var f = createPred();
+		assert.equal(f._maker, createPred);
+		$.debug(false);
+	},
+
+	'debug() adds creationStack to certain functions': function(_, assert) {
+		var
+			add = function(x) { return x+1 },
+			mult = function(x) { return x*2 },
+			add_mult = $.compose(mult, add);
+
+		$.debug(true);
+
+		var mult_add = $.compose(add, mult);
+
+		assert.equal(add_mult._creation_stack, undefined, 'does not affect already created functions');
+		assert.ok(mult_add._creation_stack, 'adds stack to newly created functions');
+		assert.ok(
+			mult_add && mult_add._creation_stack.match(__filename),
+			'records file where it was created'
+		);
+		$.debug(false);
+	}
 };
 

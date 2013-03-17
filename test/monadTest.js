@@ -553,12 +553,6 @@ module.exports = {
 		var m1 = M.result(1);
 		var m2 = M.result(2);
 		var m3 = M.result(3);
-
-		/*
-		M.sequence([m1, m2, m3]).run(function(result, s) {
-			assert.equal(s && s.be, 'closing', 'sequence preserves state');
-		}, monadErr(assert), { be: 'closing' });
-		*/
 	}, 
 
 	'AsyncMonad is also a state monad': function(b, assert) {
@@ -677,6 +671,30 @@ module.exports = {
 			assert.equal(count, 2);
 			assert.equal(bad_count, 0);
 		});
+	},
+
+	'setFor sets a value only within the passed monad': function(beforeExit, assert) {
+		var
+			checkMe = function(val, msg) {
+				return M.get('me').pipe(function(me) {
+					assert.equal(me, val, msg);
+
+					return M.result('checked');
+				});
+			},
+			monad = M,
+			state = {me: 'you'},
+			m1 = checkMe('you'),
+			m2 = m1 .then(
+				M.setFor('me', 'bob',
+					checkMe('bob', 'sets the value inside the piped monad') .then(
+						checkMe('bob', 'sets the value inside sub-piped monads')
+					)
+				) .then(checkMe('you', 'does not affect actions outside passed monad'))
+			);
+
+		m1.run(_.inert, monadErr(assert), state);
+		m2.run(_.inert, monadErr(assert), state);
 	}
 };
 
