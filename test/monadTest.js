@@ -641,6 +641,26 @@ module.exports = {
 		});
 	},
 
+	'pipeline composes a list of pipeable functions into one pipeable function': function(b, assert) {
+		var
+			a = function(x) {
+				return M.result(x*2);
+			},
+			b = function(x) {
+				return M.result(x + 1);
+			},
+			c = function(x) {
+				return M.result(x.toString() + ' little Indians');
+			};
+
+		M.result(3).pipe(M.pipeline([a,b,c]))
+			.run(function(text) {
+				assert.equal(text, '7 little Indians');
+			}, function(err) {
+				throw err;
+			});
+	},
+
 	'Bad function calls generate helpful error information': function(beforeExit, assert) {
 		var count = 0;
 		var bad_count = 0;
