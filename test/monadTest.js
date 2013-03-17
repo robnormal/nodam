@@ -45,7 +45,8 @@ var path3 = __dirname + '/fixtures/monadTest3.txt';
 
 function monadErr(assert, msg) {
 	return function(err) {
-		assert.ok(false, msg || ('Monad error: ' + err));
+		// assert.ok(false, msg || ('Monad error: ' + err));
+    throw err;
 	};
 }
 
@@ -609,7 +610,7 @@ module.exports = {
 		});
 	},
 
-	'sequence_ combines a list of monads with then()': function(b, assert) {
+	'sequence_ combines a list of monads with then()': function(beforeExit, assert) {
 		var a,b,c, ma, mb, mc, m;
 
 		ma = M.result(1).mmap(function(n) { a = n; });
@@ -620,9 +621,11 @@ module.exports = {
 			throw new Error('Monad error: ' + err);
 		});
 
-		assert.equal(a, 1);
-		assert.equal(b, 2);
-		assert.equal(c, 3);
+    beforeExit(function() {
+      assert.equal(a, 1);
+      assert.equal(b, 2);
+      assert.equal(c, 3);
+    });
 	},
 
 	'sequence is like sequence_, but returns the values of the monads': function(b, assert) {

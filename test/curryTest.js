@@ -182,24 +182,24 @@ module.exports = {
 		$.debug(false);
 	},
 
-	'creationStack adds a creationStack to a function if debugging is on': function(_, assert) {
+	'makeStack adds a makeStack to a function if debugging is on': function(_, assert) {
 		var f = function() {};
 
-		$.creationStack(f);
+		$.makeStack(f);
 		assert.equal(f._creation_stack, undefined, 'does nothing when debugging is off');
 
 		$.debug(true);
-		$.creationStack(f);
+		$.makeStack(f);
 
 		assert.ok(f._creation_stack, 'adds _creation_stack');
 		$.debug(false);
 	},
 
-	'madeAt returns origin from creationStack': function(_, assert) {
+	'madeAt returns origin from makeStack': function(_, assert) {
 		var f = function() {};
 
 		$.debug(true);
-		$.creationStack(f);
+		$.makeStack(f);
 
 		assert.ok($.madeAt(f).match(__filename),
 			'madeAt returns proper filename (and, we hope, line number)'
@@ -207,11 +207,11 @@ module.exports = {
 		$.debug(false);
 	},
 
-	'creationStack adds _maker property': function(_, assert) {
+	'makeStack adds _maker property': function(_, assert) {
 		$.debug(true);
 
 		function createPred() {
-			return $.creationStack(function(x) { return x - 1 });
+			return $.makeStack(function(x) { return x - 1 });
 		}
 
 		var f = createPred();
@@ -219,7 +219,7 @@ module.exports = {
 		$.debug(false);
 	},
 
-	'debug() adds creationStack to certain functions': function(_, assert) {
+	'debug() adds makeStack to certain functions': function(_, assert) {
 		var
 			add = function(x) { return x+1 },
 			mult = function(x) { return x*2 },
