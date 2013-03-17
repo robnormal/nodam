@@ -469,7 +469,7 @@ module.exports = {
 
 	'lift() turns a non-monadic function into a monadic one': function(beforeExit, assert) {
 		// join array of lines into string
-		var unlines = _.method('join', "\n");
+		var unlines = _.method('join', ["\n"]);
 		var unlinesM = M.liftM(unlines);
 
 		var reads = M.combine([

@@ -95,17 +95,30 @@ module.exports = {
 		assert.equal(obj.add(2), 5);
 	},
 
-	'method() returns a function which calls the given method on its argument': function(_, assert) {
+	'method() returns a function which calls the given method on its argument': function(before, assert) {
 		var upcase = $.method('toUpperCase');
 		assert.equal(upcase('yo ho ho'), 'YO HO HO');
 
-		var bowdlerize = $.method('replace', /curses/, 'kisses');
+		var bowdlerize = $.method('replace', [/curses/, 'kisses']);
 		assert.equal(bowdlerize('curses, foiled again'), 'kisses, foiled again',
 			'passes extra arguments to object method');
 
-		var i8n = $.method('replace', /english/);
+		var i8n = $.method('replace', [/english/]);
 		assert.equal(i8n('I speak english', 'deutsch'), 'I speak deutsch',
 			'allows extra arguments when called');
+
+		var count = 0;
+
+		try {
+			$.method('replace', /yo/, 'hi');
+		} catch(e) {
+			count++;
+			assert.ok(e instanceof TypeError, 'throws an error if argument list is not an array');
+		}
+
+		before(function() {
+			assert.equal(count, 1);
+		});
 	},
 
 	'compose() composes functions': function(_, assert) {
