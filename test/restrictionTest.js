@@ -98,7 +98,7 @@ module.exports = {
 		var count = 0;
 
 		var f = R.restrictArgs(R.isFunctionAt(0, 'first should be function'), function(a,b,c) {});
-		var g = R.restrictArgs(R.isTypeAt(Function, 0, 'first should be function'), function(a,b,c) {});
+		var g = R.restrictArgs(R.isInstanceAt(Function, 0, 'first should be function'), function(a,b,c) {});
 
 		try {
 			f(3);
@@ -205,7 +205,6 @@ module.exports = {
 			if (! (e instanceof R.RestrictionError)) {
 				throw e;
 			}
-			console.log(e);
 			assert.fail('proper arguments to passed function do not throw error');
 		}
 
@@ -233,9 +232,9 @@ module.exports = {
 
 		try {
 			checkExists(3);
+			count++;
 		} catch (e) {
 			if (! (e instanceof R.RestrictionError)) throw e;
-			console.log(e);
 			assert.fail('defined argument does not throw an error');
 		}
 
@@ -247,7 +246,36 @@ module.exports = {
 			count++;
 		}
 
-		assert.equal(count, 1);
+		assert.equal(count, 2);
+		$.debug(false);
+	},
+
+	'Array restrictions': function(before, assert) {
+		$.debug(true);
+		var
+			count = 0,
+			r = R.isArrayOf(Object),
+			// returns array of objects
+			f = R.restrictReturn(r, function(a, b) { return [{x: a}, {x: b}] }),
+			// returns an object
+			g = R.restrictReturn(r, function(a, b) { return {a: b} });
+
+		try {
+			f(1,2);
+			count++;
+		} catch (e) {
+			if (! (e instanceof R.RestrictionError)) throw e;
+			assert.fail('returning an array of objects does not throw an error');
+		}
+
+		try {
+			g(1,2);
+			assert.fail('returning an object throws an error');
+		} catch (e) {
+			if (! (e instanceof R.CheckError)) throw e;
+			count++;
+		}
+
 		$.debug(false);
 	}
 };
