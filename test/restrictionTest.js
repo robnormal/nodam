@@ -3,7 +3,6 @@ var R = require('../lib/restriction.js');
 var $ = require('../lib/curry.js');
 
 module.exports = {
-	/*
 	'Restrictions': function(_, assert) {
 		$.debug(true);
 
@@ -35,10 +34,10 @@ module.exports = {
 
 		var count = 0;
 		try {
-			R.restrict(rr3, function(a, b, c) {
+			R.restrictArgs(rr3, function(a, b, c) {
 			})(6, 1, 2993);
 		} catch (e) {
-			assert.ok(e instanceof R.RestrictionError);
+			if (! (e instanceof R.RestrictionError)) throw e;
 			count++;
 		}
 
@@ -47,7 +46,7 @@ module.exports = {
 		$.debug(false);
 
 		try {
-			R.restrict(rr3, function(a, b, c) {
+			R.restrictArgs(rr3, function(a, b, c) {
 			})(6, 1, 2993);
 
 			assert.ok(true, 'restrict does nothing if not debugging');
@@ -80,9 +79,7 @@ module.exports = {
 			h(2, 3);
 			assert.fail('wrong arity causes error');
 		} catch(e) {
-			if (! (e instanceof R.RestrictionError)) {
-				throw e;
-			}
+			if (! (e instanceof R.RestrictionError)) throw e;
 			count++;
 		}
 
@@ -99,8 +96,9 @@ module.exports = {
 	'Various Restrictions': function(before, assert) {
 		$.debug(true);
 		var count = 0;
-		var f = R.restrict(R.isFunction(0, 'first should be function'), function(a,b,c) {});
-		var g = R.restrict(R.isType(Function, 0, 'first should be function'), function(a,b,c) {});
+
+		var f = R.restrictArgs(R.isFunctionAt(0, 'first should be function'), function(a,b,c) {});
+		var g = R.restrictArgs(R.isTypeAt(Function, 0, 'first should be function'), function(a,b,c) {});
 
 		try {
 			f(3);
@@ -116,6 +114,7 @@ module.exports = {
 			f(function() {});
 			count++;
 		} catch(e) {
+			if (! (e instanceof R.RestrictionError)) throw e;
 			assert.fail('function argument should not throw error');
 		}
 
@@ -123,22 +122,18 @@ module.exports = {
 			g(3);
 			assert.fail('non-function argument throws error');
 		} catch(e) {
-			if (! (e instanceof R.RestrictionError)) {
-				throw e;
-			}
+			if (! (e instanceof R.RestrictionError)) throw e;
 			count++;
 		}
 
-		var h = R.restrict(R.isDefined(1, 'second arg should be defined'), function() {});
+		var h = R.restrictArgs(R.isDefinedAt(1, 'second arg should be defined'), function() {});
 		$.debug(false);
 
 		try {
 			h(3);
 			assert.fail('undefined second argument throws error');
 		} catch(e) {
-			if (! (e instanceof R.RestrictionError)) {
-				throw e;
-			}
+			if (! (e instanceof R.RestrictionError)) throw e;
 			count++;
 		}
 
@@ -157,8 +152,8 @@ module.exports = {
 			f = function(a,b) {
 				return a + ':' + b;
 			},
-			g = R.restrict(r, f),
-			h = R.restrict(rr, f);
+			g = R.restrictArgs(r, f),
+			h = R.restrictArgs(rr, f);
 
 		assert.equal(g(3, 5), '8:5');
 		assert.equal(h(3, 5), '8:5');
@@ -171,25 +166,25 @@ module.exports = {
 			r2 = rr2.and(rr),
 			r3 = rr.and(rr2);
 
-		assert.equal(R.restrict(r2, f)(3, 5), '7:4');
-		assert.equal(R.restrict(r3, f)(3, 5), '6:4');
+		assert.equal(R.restrictArgs(r2, f)(3, 5), '7:4');
+		assert.equal(R.restrictArgs(r3, f)(3, 5), '6:4');
 
 		$.debug(false);
 	},
-	*/
 
 	'typedFunction': function(before, assert) {
 		$.debug(true);
+
 		var
 			count = 0,
 			f = function(a, f) {
 				f(3);
 			},
-			must_have_first = R.isDefined(0, 'first arg should be defined'),
+			must_have_first = R.isDefinedAt(0, 'first arg should be defined'),
 			r = R.typedFunction(must_have_first, 1, 'Function must satisfy:');
 
 		try {
-			R.restrict(r, function(x,f) {
+			R.restrictArgs(r, function(x,f) {
 				f(x); // first argument is defined
 			})(4, 6);
 
@@ -202,7 +197,7 @@ module.exports = {
 		}
 
 		try {
-			R.restrict(r, function(x,f) {
+			R.restrictArgs(r, function(x,f) {
 				f(x); // first argument is defined
 			})(4, function() {});
 			count++;
@@ -215,19 +210,44 @@ module.exports = {
 		}
 
 		try {
-			R.restrict(r, function(x,f) {
+			R.restrictArgs(r, function(x,f) {
 				f(); // no first argument
 			})(4, function() {});
 			assert.fail('bad arguments to passed function throw error');
 		} catch (e) {
-			if (! (e instanceof R.RestrictionError)) {
-				$.debug(false);
-				throw e;
-			}
+			if (! (e instanceof R.RestrictionError)) throw e;
 			count++;
 		}
 
 		assert.equal(count, 3);
+		$.debug(false);
+	},
+
+	'Restrict return values':  function(before, assert) {
+		$.debug(true);
+
+		// a function that throws an error if its argument is undefined
+		var
+			count = 0,
+			checkExists = R.restrictReturn(R.isDefined(), $.identity);
+
+		try {
+			checkExists(3);
+		} catch (e) {
+			if (! (e instanceof R.RestrictionError)) throw e;
+			console.log(e);
+			assert.fail('defined argument does not throw an error');
+		}
+
+		try {
+			checkExists(count.blahblah);
+			assert.fail('undefined argument throws an error');
+		} catch (e) {
+			if (! (e instanceof R.CheckError)) throw e;
+			count++;
+		}
+
+		assert.equal(count, 1);
 		$.debug(false);
 	}
 };

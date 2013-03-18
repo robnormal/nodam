@@ -173,6 +173,12 @@ module.exports = {
 	},
 
 	'debug() turns debugging on': function(_, assert) {
+		if ($.debugging()) {
+			console.error('$.debugging() should be false. ' +
+				'Perhaps you forgot to turn it off in a previous test?');
+		}
+
+		$.debug(false);
 		assert.equal($.debugging(), false);
 
 		$.debug(true);
