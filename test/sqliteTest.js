@@ -3,8 +3,8 @@
 var
 	_    = require('../lib/curry.js'),
 	mb   = require('../lib/Maybe.js'),
-	M    = require('../lib/nodam.js'),
-	sqlM = require('../lib/sqlite.js'),
+	M    = require('../lib/nodam-basic.js'),
+	sqlM = require('../lib/sqlite-basic.js'),
 	sql  = require('sqlite3');
 
 var path1 = __dirname + '/fixtures/monadTest.txt';
@@ -121,6 +121,7 @@ module.exports = {
 		});
 	},
 
+	/*
 	'eachM() loops over rows': function(beforeExit, assert) {
 		var count = 0;
 
@@ -146,6 +147,7 @@ module.exports = {
 			assert.equal(count, 2);
 		});
 	},
+	*/
 
 	'sqlite monadic methods preserve state': function(beforeExit, assert) {
 		var
@@ -176,7 +178,7 @@ module.exports = {
 					assert.ok(s);
 
 					if (s) {
-						assert.equal(s && s.alice, 'bob');
+						assert.equal(s.alice, 'bob');
 						assert.equal(s.foo, 'bar');
 						assert.equal(s.say, 'cheese');
 					}
@@ -218,6 +220,7 @@ module.exports = {
 			return db.serialize();
 		});
 
+		/*
 		// each
 		checkSets(function(db) {
 			return db.run('CREATE TABLE foo (bar TEXT)')
@@ -225,8 +228,7 @@ module.exports = {
 				.then(db.run("INSERT INTO foo VALUES ('sue')"))
 				.then(db.eachM("SELECT * FROM foo", [], M.result));
 		});
-
-/*
+		*/
 
 		// get()
 		set1 .then(openDB) .pipe(function(db) {
@@ -234,11 +236,9 @@ module.exports = {
 				db.get('CREATE TABLE foo (bar TEXT)')
 			) .set('say', 'cheese');
 		}) .run(function(u, s) {
-			checkState(u, s);
 			assert.equal(s.foo, 'bar');
 			assert.equal(s.say, 'cheese');
 		}, err, state);
-		*/
 
 	}
 };
