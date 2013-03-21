@@ -291,6 +291,41 @@ module.exports = {
 				assert.equal(result, 'mama loves me');
 			}, _.inert, { joe: 'blow' });
 
+		M.get('joe')
+			.pipe(function(joe) {
+				assert.equal(joe, 'blow', 'state unaffected before set');
+				return M.result(joe);
+			})
+			.set('joe', 'mama').pipe(function(joe) {
+				piped_after = true;
+				// assert.equal(joe, 'mama', 'get() retrieved the right value');
+
+				return M.result(joe + ' loves me');
+			})
+			.run(function(result) {
+				succeeded = true;
+				assert.equal(result, 'mama loves me');
+			}, _.inert, { joe: 'blow' });
+
+
+		// set between each step
+		M.set('alice', 'bob')
+			.then(M.result(234))
+			.pipe(function(n) {
+				return M.set('foo', 'bar')
+					.then(M.result(5*n))
+					.set('say', 'cheese');
+			})
+			.run(function(u, s) {
+				assert.ok(s);
+				if (s) {
+					assert.equal(s.alice, 'bob');
+					assert.equal(s.foo, 'bar');
+					assert.equal(s.say, 'cheese');
+				}
+			}, function(err) {
+				assert.fail(err);
+			}, {});
 
 		beforeExit(function() {
 			assert.ok(piped_after, 'pipe after set worked');
