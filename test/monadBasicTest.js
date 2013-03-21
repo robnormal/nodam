@@ -3,6 +3,7 @@
 var _ = require('../lib/curry.js');
 var mb = require('../lib/Maybe.js');
 var M = require('../lib/nodam-basic.js');
+var E = require('../lib/Either.js');
 
 var mfs = M.fs();
 var fs = require('fs');
@@ -110,7 +111,7 @@ module.exports = {
 		var count = 0;
 
 		var a = function(mstuff) {
-			mstuff.success(mb.right(100), mstuff.state);
+			mstuff.success(E.right(100), mstuff.state);
 		};
 
 		var async;
@@ -188,6 +189,41 @@ module.exports = {
 		beforeExit(function() {
 			assert.equal(count, 2);
 			assert.equal(bad_count, 0);
+		});
+	},
+
+	'piping from an AsyncFailure has no effect': function(beforeExit, assert) {
+		var fail = new M.AsyncFailure('No good');
+
+		var fail_callback_ran = false;
+
+		fail.pipe(function(x) {
+			assert.fail('pipe after AsyncFailure does not run');
+
+			return M.result();
+		}).run(_.inert, _.inert, {});
+
+		M.result(6).pipe(function(x) {
+			return mfs.readFile(path1).pipe(function(text) {
+				return new M.AsyncFailure(42);
+			});
+		}).pipe(function(x) {
+			assert.fail('pipe after pipe that returned AsyncFailure does not run');
+
+			return M.result();
+		}).pipe(function() {
+			assert.fail('pipe after pipe that returned AsyncFailure does not run - part 2');
+
+			return M.result();
+		}).run(function() {
+			assert.fail('success callback does not run for AsyncFailure');
+		}, function(err) {
+			fail_callback_ran = true;
+			assert.equal(err, 42, 'passes its enclosed value to failure callback');
+		});
+
+		beforeExit(function() {
+			assert.ok(fail_callback_ran);
 		});
 	},
 
@@ -370,7 +406,7 @@ module.exports = {
 		});
 	},
 
-	'combine() passes': function(beforeExit, assert) {
+	'combine() passes an array of Eithers': function(beforeExit, assert) {
 		var
 			nonexistent = __dirname + '/fixtures/NON-EXISTENT',
 			errAfterSkipsPipe = true,
@@ -417,7 +453,9 @@ module.exports = {
 			assert.ok(! errAfterSkipsPipe, 'piped function is not skipped');
 			assert.ok(errWithin, 'rescue inside combine works');
 		});
-	}
+	},
+
+
 
 };
 

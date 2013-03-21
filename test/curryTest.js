@@ -152,14 +152,6 @@ module.exports = {
 		assert.equal(f.apply(void 0, h([a, b, c])), $.mapArgs(f, h)(a, b, c));
 	},
 
-	'Maybe works as expected': function(_, assert) {
-		assert.ok(M.nothing.isNothing());
-		assert.ok(! M.nothing.isJust());
-
-		assert.ok(M.just(4).isJust());
-		assert.ok(! M.just(4).isNothing());
-	},
-
 	'Stack is a single-linked list': function(_, assert) {
 		var s = new $.Stack();
 
