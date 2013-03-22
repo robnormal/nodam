@@ -455,15 +455,29 @@ module.exports = {
 		});
 	},
 
-	'forever()': function(beforeExit, assert) {
+	'no way I know of to test forever() or loop()': function(beforeExit, assert) {
+		/*
 		var m = M.result(0).pipe(function(x) {
-			console.log(x);
-
 			return M.result(x + 1);
 		});
 
 		m.forever().run(_.inert, _.inert);
-	}
+		*/
+	}, 
+
+	'loopWhile() loops function until the condition is false wrt the last result of the function': function(beforeExit, assert) {
+		var m = M.result('abc')
+			.loopWhile(
+				function(x) { return x.length < 100 },
+				function(x) {
+					return M.result(x + x);
+				}
+			);
+
+		m.run(function(x) {
+			assert.ok(x.length >= 100);
+		});
+	}	
 
 };
 
