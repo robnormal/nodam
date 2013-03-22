@@ -3,8 +3,8 @@
 var
 	_    = require('../lib/curry.js'),
 	mb   = require('../lib/Maybe.js'),
-	M    = require('../lib/nodam-basic.js'),
-	sqlM = require('../lib/sqlite-basic.js'),
+	M    = require('../lib/nodam.js'),
+	sqlM = require('../lib/sqlite.js'),
 	sql  = require('sqlite3');
 
 var path1 = __dirname + '/fixtures/monadTest.txt';

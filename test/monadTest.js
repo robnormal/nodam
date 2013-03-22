@@ -3,6 +3,7 @@
 var _ = require('../lib/curry.js');
 var mb = require('../lib/Maybe.js');
 var M = require('../lib/nodam.js');
+var E = require('../lib/Either.js');
 
 var mfs = M.fs();
 var fs = require('fs');
@@ -105,369 +106,6 @@ module.exports = {
 		assert.equal(ww.unwrap()[0], 'thisis1');
 	},
 
-
-	'AsyncMonad serializes functions': function(beforeExit, assert) {
-		var count = 0;
-
-		var a = function(yes, no) {
-			yes(100);
-		};
-
-		var async;
-		doesntThrow(assert, function() {
-			async = new M.AsyncMonad(a);
-			async.run(_.identity, _.identity);
-		});
-
-		var b = async.pipe(function(x) {
-			count++;
-
-			return M.AsyncMonad.result(x * 10);
-		});
-
-		b.run(function(out) {
-			count++;
-
-			assert.equal(out, 1000, 'pipe() works');
-		}, _.identity);
-
-		beforeExit(function() {
-			assert.equal(count, 2);
-		});
-	},
-
-	'readFile monadically reads files': function(beforeExit, assert) {
-		// counter to ensure our callbacks get called
-		var count = 0;
-
-		mfs.readFile(path1, 'ascii') .pipe(function(x) {
-			var y = require('fs').readFileSync(path1, 'ascii');
-			assert.equal(x, y);
-
-			count++;
-
-			return M.AsyncMonad.result(x.length);
-		}).pipe(function(len) {
-			var y = require('fs').readFileSync(path1, 'ascii');
-			assert.equal(len, y.length);
-
-			count++;
-
-			return M.AsyncMonad.result(null);
-		}).run(_.identity, _.identity);
-
-		beforeExit(function() {
-			assert.equal(count, 2);
-		});
-	},
-
-	'readFile passes errors to "failure" callback': function(beforeExit, assert) {
-		var path = __dirname + '/fixtures/NON-EXISTENT';
-
-		var count = 0;
-		var bad_count = 0;
-
-		function myErr(err) {
-			count++;
-		}
-
-		// should send error to myErr...
-		mfs.readFile(path, 'ascii').run(_.identity, myErr);
-
-		// even if it's piped first
-		mfs.readFile(path, 'ascii') .pipe(function(x) {
-			// this should not run
-			bad_count++;
-
-			return M.AsyncMonad.result(x.length);
-		}).run(_.identity, myErr);
-
-		beforeExit(function() {
-			assert.equal(count, 2);
-			assert.equal(bad_count, 0);
-		});
-	},
-
-	'onErr overrides failure callback': function(beforeExit, assert) {
-		var 
-			nonexistent = __dirname + '/fixtures/NON-EXISTENT',
-			count = 0,
-			bad_count = 0,
-			good_count = 0,
-			override_count = 0;
-
-		function wrongErr(err) {
-			count++;
-		}
-
-		function overrideErr(err) {
-			override_count++;
-		}
-
-		// should send error to overrideErr...
-		mfs.readFile(nonexistent, 'ascii')
-			.onErr(overrideErr)
-			.run(_.identity, wrongErr);
-
-		// even if it's piped first...
-		mfs.readFile(nonexistent, 'ascii') .pipe(function(x) {
-			// this should not run
-			bad_count++;
-
-			return M.AsyncMonad.result(x.length);
-		}).onErr(overrideErr).run(_.identity, wrongErr);
-
-		// or afterward
-		mfs.readFile(path1, 'ascii') .pipe(function(x) {
-			// this SHOULD run
-			good_count++;
-
-			return mfs.readFile(nonexistent, 'ascii');
-		})  .onErr(overrideErr)   .pipe(function(x) {
-			// this should not run
-			bad_count++;
-
-			return M.AsyncMonad.result(x.length);
-		}).run(_.identity, wrongErr);
-
-
-		beforeExit(function() {
-			assert.equal(count, 0);
-			assert.equal(bad_count, 0);
-			assert.equal(good_count, 1);
-			assert.equal(override_count, 3);
-		});
-	},
-
-	'combine() runs multiple async requests in parallel': function(beforeExit, assert) {
-		var 
-			text1 = fs.readFileSync(path1, 'ascii'),
-			text2 = fs.readFileSync(path2, 'ascii'),
-
-			count = 0,
-			m1 = mfs.readFile(path1, 'ascii'),
-			m2 = mfs.readFile(path2, 'ascii');
-
-		var m = M.AsyncMonad .combine([m1, m2]);
-
-		var func = function(file1, file2) {
-			assert.equal(file1, text1);
-			assert.equal(file2, text2);
-
-			count++;
-			return M.AsyncMonad.result(file1.length + file2.length);
-		};
-		func.id = 'combine pipe';
-
-		var mm = m .pipeArray( func);
-
-		mm.run(function(x) {
-			assert.equal(x, 55, 'Got both files, and measured their combined length');
-			count++;
-		}, function(err) {
-			throw err;
-		});
-
-		beforeExit(function() {
-			assert.equal(count, 2);
-		});
-	},
-
-	'AsyncMonad catches errors arising in combine() actions': function(beforeExit, assert) {
-		var
-			nonexistent = __dirname + '/fixtures/NON-EXISTENT',
-			override_count = 0,
-			bad_count = 0;
-
-		var 
-			m = M.AsyncMonad.combine([
-				mfs.readFile(path1, 'ascii'),
-				mfs.readFile(nonexistent, 'ascii')
-			])
-			.onErr(function (err) {
-				override_count++;
-			})
-			.pipe(function(texts) {
-				bad_count++;
-			})
-		;
-
-		m.run();
-
-		beforeExit(function() {
-			assert.equal(override_count, 1);
-			assert.equal(bad_count, 0);
-		});
-	},
-
-	'combine() throws an Error if it does not get an array': function(b, assert) {
-		assert.throws(function(){
-			M.AsyncMonad .combine(
-				mfs.readFile('blah', 'ascii'),
-				mfs.readFile('yada', 'ascii'));
-		}, Error);
-		doesntThrow(function(){
-			M.AsyncMonad .combine([
-				mfs.readFile('blah', 'ascii'),
-				mfs.readFile('yada', 'ascii')
-			]);
-		}, Error, 'But not if you put your monads in an array');
-	},
-
-	'AsyncMonad is associative': function(beforeExit, assert) {
-		var
-			path1 = __dirname + '/fixtures/monadTest.txt',
-			path2 = __dirname + '/fixtures/monadTest2.txt',
-			path3 = __dirname + '/fixtures/monadTest3.txt',
-			text1 = fs.readFileSync(path1, 'ascii'),
-			text2 = fs.readFileSync(path2, 'ascii'),
-			count = 0,
-			lines = function(str) {
-				return str.split("\n");
-			},
-			numberLines = function(str) {
-				return lines(str).map(function(s, index) {
-					return index + ': ' + s;
-				});
-			},
-			f2 = function(text2) {
-				// add line numbers to text2 and append text3
-				return mfs.readFile(path3) .mmap(function(text3) {
-					return numberLines(text2) + "\n" + text3;
-				});
-			},
-			getMonad2 = function(str) {
-				// repeat next text as many times as there are characters
-				// in this text
-				var repeat_text = _.curry(_.repeat, str.length);
-				return mfs.readFile(path2).mmap(repeat_text).mmap(_.method('join'));
-			},
-			m1, m2
-		;
-
-
-		// build the monad two different ways
-		m1 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
-			return getMonad2(text) .pipe(f2);
-		});
-
-		m2 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
-			return getMonad2(text);
-		}) .pipe(f2);
-		
-
-		// capture outputs, then check them in the beforeExit callback
-		var output1, output2;
-		m1.run(function(str) {
-			output1 = str;
-		});
-		m2.run(function(str) {
-			output2 = str;
-		});
-
-		beforeExit(function() {
-			assert.equal(output1, output2);
-		});
-	},
-
-	'loop!': function(beforeExit, assert) {
-		var time = function() {
-			return getTime();
-		};
-
-		var a = mfs.readFile(__dirname + '/fixtures/monadTest.txt', 'ascii');
-
-		// there are easier ways to do a timed loop, but...
-		var started = time();
-		var lastTimeCalled = 0;
-		var totalTime = 100;
-
-		// do for one second, every tenth of a second
-		var b = a .pipe(function(text) {
-			// return a message and the current time
-			return M.AsyncMonad.result([
-				'monadTest.txt is ' + text.length + ' characters long',
-				time()
-			]);
-		}) .loopWhile(function(result) {
-			if (result[1] < started + totalTime) {
-				lastTimeCalled = time();
-				return true;
-			} else {
-				return false;
-			}
-		}, 10);
-
-		// this consumes a lot of CPU, reading a file 10
-		// times in a second
-		var timed_run_finished = false;
-		b.run(function(result) {
-			assert.ok(lastTimeCalled < started + totalTime, 'Stopped calling at proper time');
-			assert.ok(time() >= started + totalTime, 'Stopped calling at proper time');
-
-			var file = fs.readFileSync(__dirname + '/fixtures/monadTest.txt', 'ascii');
-			assert.equal(result[0], 'monadTest.txt is ' + file.length + ' characters long');
-
-			timed_run_finished = true;
-		});
-
-		var runs = 0;
-		var recordRuns = function(x) {
-			runs++;
-			return M.AsyncMonad.result(x);
-		};
-
-		var pipe_continues = false;
-		var d = a .pipe(recordRuns) .loop(5) .pipe(function(x) {
-			pipe_continues = true;
-			return M.AsyncMonad.result(x);
-		});
-
-		var finishes = false;
-		d.run(function() {
-			finishes = true;
-		});
-
-		beforeExit(function() {
-			assert.ok(timed_run_finished, 'run() works after loop');
-			assert.equal(runs, 5, 'loop(5) runs 5 times');
-			assert.ok(pipe_continues, 'Pipe continues after loop');
-			assert.ok(finishes, 'run() works after loop');
-		});
-	},
-
-	'nodam.setTimeout, monadic timer': function(beforeExit, assert) {
-		
-		var time1, time2;
-		var monad = M;
-
-		monad
-			.result(getTime())
-			.pipe(function(t) {
-
-				time1 = t;
-				return M.result();
-
-			}) .then( M.setTimeout(100)) .pipe(function() {
-
-				return M.result(getTime());
-
-			}) .run(function(t) {
-
-				time2 = t;
-
-			}, monadErr(assert));
-
-		beforeExit(function() {
-			assert.ok(time1 && time2, 'monadic action was run');
-
-			// check against 99 ms instead of 100, because the internal
-			// timer does not always line up precisely and there appears
-			// to be a rounding error on some systems
-			assert.ok(time2 >= time1 + 99, 'timeout worked');
-		});
-	},
-
 	'lift() turns a non-monadic function into a monadic one': function(beforeExit, assert) {
 		// join array of lines into string
 		var unlines = _.method('join', ["\n"]);
@@ -515,98 +153,6 @@ module.exports = {
 			assert.ok(text1);
 			assert.ok(text2);
 			assert.equal(text1, text2);
-		});
-	},
-
-	'Maybe is a Monad': function(b, assert) {
-		assert.ok(mb.Maybe.prototype.pipe && mb.Maybe.result, 'Maybe has Monad methods');
-
-		doesntThrow(function() {
-			_.nothing.pipe(function(x) {
-				throw new Error('should not happen');
-			});
-		}, Error, 'piping to "nothing" should do nothing');
-
-		var x = mb.just(4).pipe(function(y) { return mb.just(2 * y); });
-
-		assert.ok(x.isJust());
-		assert.equal(x.fromJust(), 8);
-	},
-
-	'AsyncMonad is also a reader monad': function(b, assert) {
-		var monad = M;
-
-		monad
-			.result(getTime())
-			.pipe(function(t) {
-
-				return M.result();
-			}) .get('me') .pipe(function(me) {
-
-				return M.result(me);
-
-			}) .run(function(me, s) {
-
-				assert.equal(me, 'you');
-
-			}, monadErr(assert), {me: 'you'});
-
-		var m1 = M.result(1);
-		var m2 = M.result(2);
-		var m3 = M.result(3);
-	}, 
-
-	'AsyncMonad is also a state monad': function(b, assert) {
-		var
-			monad = M,
-			state = {me: 'you'},
-			m = monad.result(getTime())
-				.get('me')
-				.pipe(function(me) {
-
-					assert.equal(me, 'you');
-
-					return M.result();
-				}),
-
-			mm = m .set('me', 'bob').pipe( function(me) {
-				assert.equal(me, 'bob');
-				return M.result();
-			}) .get('me') .pipe(function(me) {
-
-				assert.equal(me, 'bob');
-
-				return M.result();
-			}) .get('me') .pipe(function(me) {
-
-				assert.equal(me, 'bob');
-
-				return M.result();
-			});
-	
-		mm.run(_.inert, monadErr(assert), state);
-		m.run(_.inert, monadErr(assert), state);
-		mm.run(_.inert, monadErr(assert), state);
-		m.run(_.inert, monadErr(assert), state);
-	}, 
-
-	'combine() preserves state': function(beforeExit, assert) {
-		var 
-			text1 = fs.readFileSync(path1, 'ascii'),
-			text2 = fs.readFileSync(path2, 'ascii'),
-
-			count = 0,
-			m1 = mfs.readFile(path1, 'ascii'),
-			m2 = mfs.readFile(path2, 'ascii'),
-			m = M.AsyncMonad .combine([m1, m2]);
-		
-		m.run(function(x, state) {
-			assert.equal(state && state.foo, 'bar');
-			count++;
-		}, monadErr(assert), { foo: 'bar' } );
-
-		beforeExit(function() {
-			assert.equal(count, 1);
 		});
 	},
 
@@ -664,26 +210,95 @@ module.exports = {
 			});
 	},
 
-	'Bad function calls generate helpful error information': function(beforeExit, assert) {
+
+	'Maybe is a Monad': function(b, assert) {
+		assert.ok(mb.Maybe.prototype.pipe && mb.Maybe.result, 'Maybe has Monad methods');
+
+		doesntThrow(function() {
+			_.nothing.pipe(function(x) {
+				throw new Error('should not happen');
+			});
+		}, Error, 'piping to "nothing" should do nothing');
+
+		var x = mb.just(4).pipe(function(y) { return mb.just(2 * y); });
+
+		assert.ok(x.isJust());
+		assert.equal(x.fromJust(), 8);
+	},
+
+	'AsyncMonad serializes functions': function(beforeExit, assert) {
+		var count = 0;
+
+		var a = function(mstuff) {
+			mstuff.success(E.right(100), mstuff.state);
+		};
+
+		var async;
+		doesntThrow(assert, function() {
+			async = new M.AsyncMonad(a);
+			async.run(function(u, s) {
+				assert.equal(u, 100);
+				assert.equal(s && s.joe, 'blow');
+			}, _.identity, {joe: 'blow'});
+		});
+
+		var b = async.pipe(function(x) {
+			count++;
+
+			return M.AsyncMonad.result(x * 10);
+		});
+
+		b.run(function(out) {
+			count++;
+
+			assert.equal(out, 1000, 'pipe() works');
+		}, _.identity);
+
+		beforeExit(function() {
+			assert.equal(count, 2);
+		});
+	},
+
+	'readFile monadically reads files': function(beforeExit, assert) {
+		// counter to ensure our callbacks get called
+		var count = 0;
+
+		mfs.readFile(path1, 'ascii') .pipe_(function(x) {
+			var y = require('fs').readFileSync(path1, 'ascii');
+			assert.equal(x, y);
+
+			count++;
+
+			return M.AsyncMonad.result(x.length);
+		}).pipe(function(len) {
+			var y = require('fs').readFileSync(path1, 'ascii');
+			assert.equal(len, y.length);
+
+			count++;
+
+			return M.AsyncMonad.result(null);
+		}).run(_.identity, _.identity);
+
+		beforeExit(function() {
+			assert.equal(count, 2);
+		});
+	},
+
+	'readFile passes errors to "failure" callback': function(beforeExit, assert) {
+		var path = __dirname + '/fixtures/NON-EXISTENT';
+
 		var count = 0;
 		var bad_count = 0;
 
 		function myErr(err) {
 			count++;
-
-			assert.ok(err.monad);
-			if (err.monad) {
-				assert.ok(err.monad.arguments);
-				assert.equal(err.monad.library, 'fs');
-				assert.equal(err.monad.callback, 'readFile');
-			}
 		}
 
 		// should send error to myErr...
-		mfs.readFile({ not_a: 'string' }).run(_.identity, myErr);
+		mfs.readFile(path, 'ascii').run(_.identity, myErr);
 
 		// even if it's piped first
-		mfs.readFile({ not_a: 'string' }, 'ascii') .pipe(function(x) {
+		mfs.readFile(path, 'ascii') .pipe(function(x) {
 			// this should not run
 			bad_count++;
 
@@ -694,6 +309,419 @@ module.exports = {
 			assert.equal(count, 2);
 			assert.equal(bad_count, 0);
 		});
+	},
+
+
+	'AsyncMonad is associative': function(beforeExit, assert) {
+		var
+			path1 = __dirname + '/fixtures/monadTest.txt',
+			path2 = __dirname + '/fixtures/monadTest2.txt',
+			path3 = __dirname + '/fixtures/monadTest3.txt',
+			text1 = fs.readFileSync(path1, 'ascii'),
+			text2 = fs.readFileSync(path2, 'ascii'),
+			count = 0,
+			lines = function(str) {
+				return str.split("\n");
+			},
+			numberLines = function(str) {
+				return lines(str).map(function(s, index) {
+					return index + ': ' + s;
+				});
+			},
+			f2 = function(text2) {
+				// add line numbers to text2 and append text3
+				return mfs.readFile(path3) .mmap(function(text3) {
+					return numberLines(text2) + "\n" + text3;
+				});
+			},
+			getMonad2 = function(str) {
+				// repeat next text as many times as there are characters
+				// in this text
+				var repeat_text = _.curry(_.repeat, str.length);
+				return mfs.readFile(path2).mmap(repeat_text).mmap(_.method('join'));
+			},
+			m1, m2
+		;
+
+
+		// build the monad two different ways
+		m1 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
+			return getMonad2(text) .pipe(f2);
+		});
+
+		m2 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
+			return getMonad2(text);
+		}) .pipe(f2);
+		
+
+		// capture outputs, then check them in the beforeExit callback
+		var output1, output2;
+		m1.run(function(str) {
+			output1 = str;
+		});
+		m2.run(function(str) {
+			output2 = str;
+		});
+
+		beforeExit(function() {
+			assert.equal(output1, output2);
+		});
+	},
+
+	'piping from an AsyncFailure has no effect': function(beforeExit, assert) {
+		var fail = new M.AsyncFailure('No good');
+
+		var fail_callback_ran = false;
+
+		fail.pipe(function(x) {
+			assert.fail('pipe after AsyncFailure does not run');
+
+			return M.result();
+		}).run(_.inert, _.inert, {});
+
+		M.result(6).pipe(function(x) {
+			return mfs.readFile(path1).pipe(function(text) {
+				return new M.AsyncFailure(42);
+			});
+		}).pipe(function(x) {
+			assert.fail('pipe after pipe that returned AsyncFailure does not run');
+
+			return M.result();
+		}).pipe(function() {
+			assert.fail('pipe after pipe that returned AsyncFailure does not run - part 2');
+
+			return M.result();
+		}).run(function() {
+			assert.fail('success callback does not run for AsyncFailure');
+		}, function(err) {
+			fail_callback_ran = true;
+			assert.equal(err, 42, 'passes its enclosed value to failure callback');
+		});
+
+		beforeExit(function() {
+			assert.ok(fail_callback_ran);
+		});
+	},
+
+	'rescue() catches errors': function(beforeExit, assert) {
+		var
+			bad_path = __dirname + '/fixtures/NON-EXISTENT',
+			got_rescued = false,
+			succeeded = false,
+			ran_err = false,
+			piped_after = false,
+			got_rescued_2 = false,
+			succeeded_2 = false,
+			ran_err_2 = false;
+
+		// should rescue error...
+		mfs.readFile(bad_path, 'ascii')
+			.rescue(function(err) {
+				got_rescued = true;
+				return M.result(5);
+			})
+			.run(function(arg, s) {
+				succeeded = true;
+				assert.equal(arg, 5, 'Passed result from rescue()');
+			}, function myErr(err) {
+				ran_err = true;
+			});
+
+		// even if it's piped first
+		mfs.readFile(bad_path, 'ascii')
+			.pipe(function(x) {
+				// this should not run
+				piped_after = true;
+
+				return M.AsyncMonad.result(x.length);
+			})
+			.rescue(function(err) {
+				got_rescued_2 = true;
+				return M.result(9);
+			})
+			.run(function(x) {
+				succeeded_2 = true;
+			}, function(err) {
+				ran_err_2 = true;
+			});
+
+		beforeExit(function() {
+			assert.ok(got_rescued, 'error caught');
+			assert.ok(succeeded, 'success callback run after error');
+			assert.ok(! ran_err, 'final error callback not run');
+
+			assert.ok(! piped_after, 'pipe skipped after error');
+			assert.ok(got_rescued_2, 'error caught after pipe');
+			assert.ok(succeeded_2, 'success callback run after error and pipe');
+			assert.ok(! ran_err_2, 'final error callback not run after pipe');
+		});
+	},
+
+	'get() retrieves state information': function(beforeExit, assert) {
+		var
+			piped_after = false,
+			succeeded = false
+			;
+
+		M.get('joe').pipe(function(joe) {
+				piped_after = true;
+				assert.equal(joe, 'blow', 'get() retrieved the right value');
+
+				return M.result(joe + 's the wind');
+			})
+			.run(function(result) {
+				succeeded = true;
+				assert.equal(result, 'blows the wind');
+			}, _.inert, { joe: 'blow' });
+
+
+		beforeExit(function() {
+			assert.ok(piped_after, 'pipe after get worked');
+			assert.ok(succeeded, 'success callback run after get');
+		});
+	},
+
+	'set() sets state information': function(beforeExit, assert) {
+		var
+			piped_after = false,
+			succeeded = false
+			;
+
+		M.get('joe')
+			.pipe(function(joe) {
+				assert.equal(joe, 'blow', 'state unaffected before set');
+				return M.result(joe);
+			})
+			.set('joe', 'mama').pipe(function(joe) {
+				piped_after = true;
+				// assert.equal(joe, 'mama', 'get() retrieved the right value');
+
+				return M.result(joe + ' loves me');
+			})
+			.run(function(result) {
+				succeeded = true;
+				assert.equal(result, 'mama loves me');
+			}, _.inert, { joe: 'blow' });
+
+		M.get('joe')
+			.pipe(function(joe) {
+				assert.equal(joe, 'blow', 'state unaffected before set');
+				return M.result(joe);
+			})
+			.set('joe', 'mama').pipe(function(joe) {
+				piped_after = true;
+				// assert.equal(joe, 'mama', 'get() retrieved the right value');
+
+				return M.result(joe + ' loves me');
+			})
+			.run(function(result) {
+				succeeded = true;
+				assert.equal(result, 'mama loves me');
+			}, _.inert, { joe: 'blow' });
+
+
+		// set between each step
+		M.set('alice', 'bob')
+			.then(M.result(234))
+			.pipe(function(n) {
+				return M.set('foo', 'bar')
+					.then(M.result(5*n))
+					.set('say', 'cheese');
+			})
+			.run(function(u, s) {
+				assert.ok(s);
+				if (s) {
+					assert.equal(s.alice, 'bob');
+					assert.equal(s.foo, 'bar');
+					assert.equal(s.say, 'cheese');
+				}
+			}, function(err) {
+				assert.fail(err);
+			}, {});
+
+		beforeExit(function() {
+			assert.ok(piped_after, 'pipe after set worked');
+			assert.ok(succeeded, 'success callback run after get');
+		});
+	},
+
+	'combine() runs multiple async requests in parallel': function(beforeExit, assert) {
+		var 
+			text1 = fs.readFileSync(path1, 'ascii'),
+			text2 = fs.readFileSync(path2, 'ascii'),
+
+			count = 0,
+			m1 = mfs.readFile(path1, 'ascii'),
+			m2 = mfs.readFile(path2, 'ascii');
+
+		var m = M.AsyncMonad .combine([m1, m2]);
+
+		var func = function(e_file1, e_file2) {
+			var file1 = e_file1.fromRight();
+			var file2 = e_file2.fromRight();
+
+			assert.equal(file1, text1);
+			assert.equal(file2, text2);
+
+			count++;
+			return M.AsyncMonad.result(file1.length + file2.length);
+		};
+		func.id = 'combine pipe';
+
+		var mm = m .pipeArray( func);
+
+		mm.run(function(x) {
+			assert.equal(x, 55, 'Got both files, and measured their combined length');
+			count++;
+		}, function(err) {
+			throw err;
+		});
+
+		beforeExit(function() {
+			assert.equal(count, 2);
+		});
+	},
+
+	'combine() passes an array of Eithers': function(beforeExit, assert) {
+		var
+			nonexistent = __dirname + '/fixtures/NON-EXISTENT',
+			errAfterSkipsPipe = true,
+			errWithin = false,
+			errWithinSkipsPipe = true;
+
+		var 
+			m1 = M.AsyncMonad.combine([
+				mfs.readFile(path1, 'ascii'),
+				mfs.readFile(nonexistent, 'ascii')
+			])
+			.pipeArray(function(e_file1, e_file2) {
+				errAfterSkipsPipe = false;
+
+				assert.ok(e_file1.isRight());
+				assert.ok(e_file2.isLeft());
+
+				return M.result(5);
+			})
+		;
+
+		var 
+			m2 = M.AsyncMonad.combine([
+				mfs.readFile(path1, 'ascii'),
+				mfs.readFile(nonexistent, 'ascii')
+					.rescue(function (err) {
+						errWithin = true;
+						return M.result(5);
+					})
+			])
+			.pipeArray(function(e_1, e_2) {
+				assert.ok(e_1.isRight());
+				assert.ok(e_2.isRight());
+				assert.equal(e_2.fromRight(), 5);
+
+				return M.result(5);
+			})
+		;
+
+		m1.run(_.inert, _.inert, {});
+		m2.run(_.inert, _.inert, {});
+
+		beforeExit(function() {
+			assert.ok(! errAfterSkipsPipe, 'piped function is not skipped');
+			assert.ok(errWithin, 'rescue inside combine works');
+		});
+	},
+
+	'combine() preserves state': function(beforeExit, assert) {
+		var 
+			text1 = fs.readFileSync(path1, 'ascii'),
+			text2 = fs.readFileSync(path2, 'ascii'),
+
+			count = 0,
+			m1 = mfs.readFile(path1, 'ascii'),
+			m2 = mfs.readFile(path2, 'ascii'),
+			m = M.AsyncMonad .combine([m1, m2]);
+		
+		m.run(function(x, state) {
+			assert.equal(state && state.foo, 'bar');
+			count++;
+		}, monadErr(assert), { foo: 'bar' } );
+
+		beforeExit(function() {
+			assert.equal(count, 1);
+		});
+	},
+
+	'no way I know of to test forever() or loop()': function(beforeExit, assert) {
+		/*
+		var m = M.result(0).pipe(function(x) {
+			return M.result(x + 1);
+		});
+
+		m.forever().run(_.inert, _.inert);
+		*/
+	}, 
+
+	'loopWhile() loops function until the condition is false wrt the last result of the function': function(beforeExit, assert) {
+		var m = M.result('abc')
+			.loopWhile(
+				function(x) { return x.length < 100 },
+				function(x) {
+					return M.result(x + x);
+				}
+			);
+
+		m.run(function(x) {
+			assert.ok(x.length >= 100);
+		});
+	},
+
+	'When debugging, bad function calls generate helpful error information': function(beforeExit, assert) {
+		M.debug(true);
+		var
+			first_err_ran = false,
+			second_err_ran = false,
+			pipe_ran = false;
+
+		try {
+			// should send error to myErr...
+			mfs.readFile({ not_a: 'string' }).run(_.inert, _.inert);
+		} catch(err) {
+			first_err_ran = true;
+
+			assert.ok(err.monad);
+			if (err.monad) {
+				assert.ok(err.monad.arguments);
+				assert.equal(err.monad.library, 'fs');
+				assert.equal(err.monad.callback, 'readFile');
+			}
+		}
+
+		try {
+			// even if it's piped first
+			mfs.readFile({ not_a: 'string' }, 'ascii') .pipe(function(x) {
+				// this should not run
+				pipe_ran = true;
+
+				return M.AsyncMonad.result(x.length);
+			}).run(_.inert, _.inert);
+		} catch(err) {
+			second_err_ran = true;
+
+			assert.ok(err.monad);
+			if (err.monad) {
+				assert.ok(err.monad.arguments);
+				assert.equal(err.monad.library, 'fs');
+				assert.equal(err.monad.callback, 'readFile');
+			}
+		}
+
+		beforeExit(function() {
+			assert.ok(first_err_ran);
+			assert.ok(! pipe_ran);
+			assert.ok(second_err_ran);
+		});
+
+		M.debug(false);
 	},
 
 	'setFor sets a value only within the passed monad': function(beforeExit, assert) {
