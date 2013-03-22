@@ -144,7 +144,7 @@ module.exports = {
 		// counter to ensure our callbacks get called
 		var count = 0;
 
-		mfs.readFile(path1, 'ascii') .pipe(function(x) {
+		mfs.readFile(path1, 'ascii') .pipe_(function(x) {
 			var y = require('fs').readFileSync(path1, 'ascii');
 			assert.equal(x, y);
 
@@ -455,7 +455,15 @@ module.exports = {
 		});
 	},
 
+	'forever()': function(beforeExit, assert) {
+		var m = M.result(0).pipe(function(x) {
+			console.log(x);
 
+			return M.result(x + 1);
+		});
+
+		m.forever().run(_.inert, _.inert);
+	}
 
 };
 
