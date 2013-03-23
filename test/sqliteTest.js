@@ -33,7 +33,7 @@ function monadErr(assert, msg) {
 
 var openDB = sqlM.database(':memory:');
 var createFoo = openDB .pipe(function(db) {
-	return db .run('CREATE TABLE foo (bar TEXT)');
+	return db.run('CREATE TABLE foo (bar TEXT)');
 });
 
 module.exports = {
@@ -41,7 +41,8 @@ module.exports = {
 		var count = 0;
 
 		openDB .mmap(function(db_open) {
-			assert.ok(db_open.db instanceof sql.Database);
+			assert.ok(db_open instanceof M.IOWrapper);
+			assert.ok(db_open.io instanceof sql.Database);
 			count++;
 		}).run(function() {
 			count++;
@@ -56,17 +57,19 @@ module.exports = {
 	},
 
 	'run() runs a query, and results in the db object': function(beforeExit, assert) {
+		M.debug(true);
 		var count = 0;
 
+		createFoo.runIt();
 		createFoo
 			.mmap(function(dbM) {
-				var is_db = dbM && dbM.db && dbM.db instanceof sql.Database;
+				var is_db = dbM && dbM.io && dbM.io instanceof sql.Database;
 
 				assert.ok(is_db);
 				count++;
 			
 				if (is_db)
-					dbM.db.get('SELECT COUNT(*) + 3 AS c FROM foo', function(err, row) {
+					dbM.io.get('SELECT COUNT(*) + 3 AS c FROM foo', function(err, row) {
 						assert.ok( !err ); // should be no errors
 						assert.equal(row.c, 3); // no rows in foo
 
@@ -76,20 +79,22 @@ module.exports = {
 			).run(function() {
 				count++;
 			}, monadErr(assert), {});
+		M.debug(false);
 
 		beforeExit(function() {
 			assert.equal(count, 3);
 		});
 	},
 
-	'get() gets a row': function(beforeExit, assert) {
+	'get() gets Maybe(row)': function(beforeExit, assert) {
 		var count = 0;
 
 		createFoo .pipe(function(db) {
 			return db.run("INSERT INTO foo VALUES ('cade')")
 				.then(db.get('SELECT * FROM foo'))
-				.mmap(function(row) {
-					assert.equal(row.bar, 'cade');
+				.mmap(function(m_row) {
+					assert.ok(m_row.isJust());
+					assert.equal(m_row.fromJust().bar, 'cade');
 					count++;
 				});
 		}).run(function() { count++ }, monadErr(assert), {});
@@ -120,34 +125,6 @@ module.exports = {
 			assert.equal(count, 2);
 		});
 	},
-
-	/*
-	'eachM() loops over rows': function(beforeExit, assert) {
-		var count = 0;
-
-		createFoo .pipe(function(db) {
-			return db
-				.run("INSERT INTO foo VALUES ('alice')")
-				.then(db.run("INSERT INTO foo VALUES ('bob')"))
-				.then(db.run("INSERT INTO foo VALUES ('eve')"))
-				.then(
-					db.eachM('SELECT * FROM foo', [], function(row) {
-						return M.result(row && row.bar);
-					})
-				).mmap(function(names) {
-					assert.equal(names.length, 3);
-					assert.equal(names[0], 'alice');
-					assert.equal(names[2], 'eve');
-
-					count++;
-				});
-		}).run(function() { count++ }, monadErr(assert), {});
-
-		beforeExit(function() {
-			assert.equal(count, 2);
-		});
-	},
-	*/
 
 	'sqlite monadic methods preserve state': function(beforeExit, assert) {
 		var
@@ -220,15 +197,6 @@ module.exports = {
 			return db.serialize();
 		});
 
-		/*
-		// each
-		checkSets(function(db) {
-			return db.run('CREATE TABLE foo (bar TEXT)')
-				.then(db.run("INSERT INTO foo VALUES ('jim')"))
-				.then(db.run("INSERT INTO foo VALUES ('sue')"))
-				.then(db.eachM("SELECT * FROM foo", [], M.result));
-		});
-		*/
 
 		// get()
 		set1 .then(openDB) .pipe(function(db) {
