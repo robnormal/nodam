@@ -237,7 +237,7 @@ module.exports = {
 		assert.equal(x.fromJust(), 8);
 	},
 
-	'AsyncMonad serializes functions': function(beforeExit, assert) {
+	'Async serializes functions': function(beforeExit, assert) {
 		var count = 0;
 
 		var a = function(mstuff) {
@@ -246,7 +246,7 @@ module.exports = {
 
 		var async;
 		doesntThrow(assert, function() {
-			async = new M.AsyncMonad(a);
+			async = new M.Async(a);
 			async.run(function(u, s) {
 				assert.equal(u, 100);
 				assert.equal(s && s.joe, 'blow');
@@ -256,7 +256,7 @@ module.exports = {
 		var b = async.pipe(function(x) {
 			count++;
 
-			return M.AsyncMonad.result(x * 10);
+			return M.Async.result(x * 10);
 		});
 
 		b.run(function(out) {
@@ -280,14 +280,14 @@ module.exports = {
 
 			count++;
 
-			return M.AsyncMonad.result(x.length);
+			return M.Async.result(x.length);
 		}).pipe(function(len) {
 			var y = require('fs').readFileSync(path1, 'ascii');
 			assert.equal(len, y.length);
 
 			count++;
 
-			return M.AsyncMonad.result(null);
+			return M.Async.result(null);
 		}).run(_.identity, _.identity);
 
 		beforeExit(function() {
@@ -313,7 +313,7 @@ module.exports = {
 			// this should not run
 			bad_count++;
 
-			return M.AsyncMonad.result(x.length);
+			return M.Async.result(x.length);
 		}).run(_.identity, myErr);
 
 		beforeExit(function() {
@@ -323,7 +323,7 @@ module.exports = {
 	},
 
 
-	'AsyncMonad is associative': function(beforeExit, assert) {
+	'Async is associative': function(beforeExit, assert) {
 		var
 			path1 = __dirname + '/fixtures/monadTest.txt',
 			path2 = __dirname + '/fixtures/monadTest2.txt',
@@ -379,7 +379,7 @@ module.exports = {
 		});
 	},
 
-	'AsyncMonad fails with a CheckError if you pipe the wrong type, but only when it runs': function(b, assert) {
+	'Async fails with a CheckError if you pipe the wrong type, but only when it runs': function(b, assert) {
 		var m1 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
 			return mb.just(text);
 		});
@@ -464,7 +464,7 @@ module.exports = {
 				// this should not run
 				piped_after = true;
 
-				return M.AsyncMonad.result(x.length);
+				return M.Async.result(x.length);
 			})
 			.rescue(function(err) {
 				got_rescued_2 = true;
@@ -490,7 +490,7 @@ module.exports = {
 				// this should not run
 				piped_after_3 = true;
 
-				return M.AsyncMonad.result(x.length);
+				return M.Async.result(x.length);
 			})
 			.run(function(arg, s) {
 				assert.fail('rescue can fail, too');
@@ -610,7 +610,7 @@ module.exports = {
 			m1 = mfs.readFile(path1, 'ascii'),
 			m2 = mfs.readFile(path2, 'ascii');
 
-		var m = M.AsyncMonad .combine([m1, m2]);
+		var m = M.Async .combine([m1, m2]);
 
 		var func = function(e_file1, e_file2) {
 			var file1 = e_file1.fromRight();
@@ -620,7 +620,7 @@ module.exports = {
 			assert.equal(file2, text2);
 
 			count++;
-			return M.AsyncMonad.result(file1.length + file2.length);
+			return M.Async.result(file1.length + file2.length);
 		};
 		func.id = 'combine pipe';
 
@@ -646,7 +646,7 @@ module.exports = {
 			errWithinSkipsPipe = true;
 
 		var
-			m1 = M.AsyncMonad.combine([
+			m1 = M.Async.combine([
 				mfs.readFile(path1, 'ascii'),
 				mfs.readFile(nonexistent, 'ascii')
 			])
@@ -661,7 +661,7 @@ module.exports = {
 		;
 
 		var
-			m2 = M.AsyncMonad.combine([
+			m2 = M.Async.combine([
 				mfs.readFile(path1, 'ascii'),
 				mfs.readFile(nonexistent, 'ascii')
 					.rescue(function (err) {
@@ -695,7 +695,7 @@ module.exports = {
 			count = 0,
 			m1 = mfs.readFile(path1, 'ascii'),
 			m2 = mfs.readFile(path2, 'ascii'),
-			m = M.AsyncMonad .combine([m1, m2]);
+			m = M.Async .combine([m1, m2]);
 
 		m.run(function(x, state) {
 			assert.equal(state && state.foo, 'bar');
@@ -758,7 +758,7 @@ module.exports = {
 				// this should not run
 				pipe_ran = true;
 
-				return M.AsyncMonad.result(x.length);
+				return M.Async.result(x.length);
 			}).run(_.inert, _.inert);
 		} catch(err) {
 			second_err_ran = true;
