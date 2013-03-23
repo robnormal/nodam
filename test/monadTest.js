@@ -4,7 +4,9 @@ var _ = require('../lib/curry.js');
 var mb = require('../lib/Maybe.js');
 var M = require('../lib/nodam.js');
 var E = require('../lib/Either.js');
+var R = require('../lib/restriction.js');
 
+		M.debug(true);
 var mfs = M.fs();
 var fs = require('fs');
 
@@ -16,6 +18,16 @@ function doesntThrow(assert, f, err) {
 			throw e;
 		}, err, e.toString());
 	}
+}
+
+function replaceListenersOnce(evName, listener) {
+	var ls = process.listeners(evName);
+	process.removeAllListeners(evName);
+
+	process.once(evName, function(ev) {
+		listener(ev);
+		_.each(ls, function(l) { process.on(evName, l) });
+	});
 }
 
 function getTime() {
@@ -210,7 +222,6 @@ module.exports = {
 			});
 	},
 
-
 	'Maybe is a Monad': function(b, assert) {
 		assert.ok(mb.Maybe.prototype.pipe && mb.Maybe.result, 'Maybe has Monad methods');
 
@@ -352,7 +363,7 @@ module.exports = {
 		m2 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
 			return getMonad2(text);
 		}) .pipe(f2);
-		
+
 
 		// capture outputs, then check them in the beforeExit callback
 		var output1, output2;
@@ -365,6 +376,28 @@ module.exports = {
 
 		beforeExit(function() {
 			assert.equal(output1, output2);
+		});
+	},
+
+	'AsyncMonad fails with a CheckError if you pipe the wrong type, but only when it runs': function(b, assert) {
+		var m1 = mfs.readFile(path1, 'ascii') .pipe(function(text) {
+			return mb.just(text);
+		});
+
+		var err_thrown = false, err_passed = false;
+		// Can't catch the error here, so 
+		replaceListenersOnce('uncaughtException', function (err) {
+			assert.ok(err instanceof R.CheckError);
+			err_thrown = true;
+		});
+
+		m1.run(_.inert, function() {
+			err_passed = true;
+		});
+
+		b(function() {
+			assert.ok(err_thrown, 'throws exception');
+			assert.ok(! err_passed, 'dose not pass exceptions as failures');
 		});
 	},
 
@@ -385,11 +418,9 @@ module.exports = {
 			});
 		}).pipe(function(x) {
 			assert.fail('pipe after pipe that returned AsyncFailure does not run');
-
 			return M.result();
 		}).pipe(function() {
 			assert.fail('pipe after pipe that returned AsyncFailure does not run - part 2');
-
 			return M.result();
 		}).run(function() {
 			assert.fail('success callback does not run for AsyncFailure');
@@ -445,6 +476,28 @@ module.exports = {
 				ran_err_2 = true;
 			});
 
+
+		var
+			piped_after_3 = false,
+			ran_err_3 = false;
+
+		// can return another failure
+		mfs.readFile(bad_path, 'ascii')
+			.rescue(function(err) {
+				return new M.AsyncFailure('another err');
+			})
+			.pipe(function(x) {
+				// this should not run
+				piped_after_3 = true;
+
+				return M.AsyncMonad.result(x.length);
+			})
+			.run(function(arg, s) {
+				assert.fail('rescue can fail, too');
+			}, function myErr(err) {
+				ran_err_3 = true;
+			});
+
 		beforeExit(function() {
 			assert.ok(got_rescued, 'error caught');
 			assert.ok(succeeded, 'success callback run after error');
@@ -454,6 +507,9 @@ module.exports = {
 			assert.ok(got_rescued_2, 'error caught after pipe');
 			assert.ok(succeeded_2, 'success callback run after error and pipe');
 			assert.ok(! ran_err_2, 'final error callback not run after pipe');
+
+			assert.ok(! piped_after_3, 'if rescue returns failure, it skips piped functions');
+			assert.ok(ran_err_3, 'failure returned from rescue is eventually passed to failure callback');
 		});
 	},
 
@@ -546,7 +602,7 @@ module.exports = {
 	},
 
 	'combine() runs multiple async requests in parallel': function(beforeExit, assert) {
-		var 
+		var
 			text1 = fs.readFileSync(path1, 'ascii'),
 			text2 = fs.readFileSync(path2, 'ascii'),
 
@@ -589,7 +645,7 @@ module.exports = {
 			errWithin = false,
 			errWithinSkipsPipe = true;
 
-		var 
+		var
 			m1 = M.AsyncMonad.combine([
 				mfs.readFile(path1, 'ascii'),
 				mfs.readFile(nonexistent, 'ascii')
@@ -604,7 +660,7 @@ module.exports = {
 			})
 		;
 
-		var 
+		var
 			m2 = M.AsyncMonad.combine([
 				mfs.readFile(path1, 'ascii'),
 				mfs.readFile(nonexistent, 'ascii')
@@ -632,7 +688,7 @@ module.exports = {
 	},
 
 	'combine() preserves state': function(beforeExit, assert) {
-		var 
+		var
 			text1 = fs.readFileSync(path1, 'ascii'),
 			text2 = fs.readFileSync(path2, 'ascii'),
 
@@ -640,7 +696,7 @@ module.exports = {
 			m1 = mfs.readFile(path1, 'ascii'),
 			m2 = mfs.readFile(path2, 'ascii'),
 			m = M.AsyncMonad .combine([m1, m2]);
-		
+
 		m.run(function(x, state) {
 			assert.equal(state && state.foo, 'bar');
 			count++;
@@ -659,7 +715,7 @@ module.exports = {
 
 		m.forever().run(_.inert, _.inert);
 		*/
-	}, 
+	},
 
 	'loopWhile() loops function until the condition is false wrt the last result of the function': function(beforeExit, assert) {
 		var m = M.result('abc')
@@ -721,7 +777,6 @@ module.exports = {
 			assert.ok(second_err_ran);
 		});
 
-		M.debug(false);
 	},
 
 	'setFor sets a value only within the passed monad': function(beforeExit, assert) {
@@ -746,6 +801,9 @@ module.exports = {
 
 		m1.run(_.inert, monadErr(assert), state);
 		m2.run(_.inert, monadErr(assert), state);
+	},
+
+	'pipeMaybe': function(b, assert) {
 	}
 };
 
