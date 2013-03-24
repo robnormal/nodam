@@ -407,7 +407,7 @@ module.exports = {
 		});
 
 		var err_thrown = false, err_passed = false;
-		// Can't catch the error here, so 
+		// Can't catch the error here, so
 		replaceListenersOnce('uncaughtException', function (err) {
 			assert.ok(err instanceof R.CheckError);
 			err_thrown = true;
@@ -623,6 +623,26 @@ module.exports = {
 		});
 	},
 
+	'set() treats failures as expected': function(b, assert) {
+		var failed;
+		var fail = new M.failure('boo');
+
+		fail.set('foo', 'bar').run(
+			function(u) {
+				assert.fail('Should not succeed after unrescued failure');
+			},
+			function(err) {
+				failed = true;
+				assert.equal(err, 'boo');
+			},
+			{ foo: 'chaa' }
+		);
+
+		b(function() {
+			assert.ok(failed, 'Should reach error callback after unrescued failure');
+		});
+	},
+
 	'combine() runs multiple async requests in parallel': function(beforeExit, assert) {
 		var
 			text1 = fs.readFileSync(path1, 'ascii'),
@@ -730,13 +750,6 @@ module.exports = {
 	},
 
 	'no way I know of to test forever() or loop()': function(beforeExit, assert) {
-		/*
-		var m = M.result(0).pipe(function(x) {
-			return M.result(x + 1);
-		});
-
-		m.forever().run(_.inert, _.inert);
-		*/
 	},
 
 	'loopWhile() loops function until the condition is false wrt the last result of the function': function(beforeExit, assert) {
@@ -826,6 +839,37 @@ module.exports = {
 	},
 
 	'pipeMaybe': function(b, assert) {
+	},
+
+	'listen() listens to an event, and passes the state present at that point to the event': function(b, assert) {
+		var piped, success_ran, err_ran;
+
+		// this function is not monadic
+		var read = mfs.createReadStream('NONEXISTENT');
+		var write = mfs.createWriteStream('test_file.txt');
+
+		var m = M.Async.listen(read, 'error', function(ev) {
+			return new M.failure(ev);
+		}).pipe(function(x) {
+			piped = true;
+
+			return M.result(read.pipe(write));
+		}).set('foo', 'chaa').then(M.result(5));
+
+		m.run(function(u) {
+
+			success_ran = true;
+			assert.equal(u, 5);
+
+		}, function(err) {
+			err_ran = true;
+		}, { foo: 'bar' });
+
+		b(function() {
+			assert.ok(piped, 'Next piped function ran');
+			assert.ok(success_ran, 'Non-event thread results in success');
+			assert.ok(err_ran, 'Event thread results in failure');
+		});
 	}
 };
 
