@@ -6,7 +6,8 @@ var M = require('../lib/nodam.js');
 var E = require('../lib/Either.js');
 var R = require('../lib/restriction.js');
 
-		M.debug(true);
+M.debug(true);
+
 var mfs = M.fs();
 var fs = require('fs');
 
@@ -38,18 +39,19 @@ function getTime() {
 function WriterMonad(x) {
 	this.x = x;
 }
-_.extend(WriterMonad.prototype, M.Monad, {
+
+M.monad$(WriterMonad, {
 	doBind: function(f) {
 		var m = f(this.x[0]);
 		return new WriterMonad([ m.x[0], this.x[1] + m.x[1] ]);
 	},
-	unwrap: function() {
-		return this.x;
+	result: function(x) {
+		return new WriterMonad([x, '']);
 	}
 });
 
-WriterMonad.result = function(x) {
-	return new WriterMonad([x, '']);
+WriterMonad.prototype.unwrap = function() {
+	return this.x;
 };
 
 var path1 = __dirname + '/fixtures/monadTest.txt';
@@ -168,6 +170,26 @@ module.exports = {
 		});
 	},
 
+	'monad$() constructs new monad "class"': function(beforeExit, assert) {
+		function Writer(x) {
+			this.x = x;
+		}
+
+		M.monad$(Writer, {
+			doBind: function(f) {
+				var m = f(this.x[0]);
+				return new WriterMonad([ m.x[0], this.x[1] + m.x[1] ]);
+			},
+
+			result: function(x) {
+				return new WriterMonad([x, '']);
+			}
+		});
+
+		assert.ok(Writer.prototype.pipe, 'adds Monad methods to prototype');
+		assert.ok(Writer.sequence, 'adds Monad class methods to constructor');
+	},
+
 	'sequence_ combines a list of monads with then()': function(beforeExit, assert) {
 		var a,b,c, ma, mb, mc, m;
 
@@ -175,7 +197,7 @@ module.exports = {
 		mb = M.result(2).mmap(function(n) { b = n; });
 		mc = M.result(3).mmap(function(n) { c = n; });
 
-		M.sequence_([ma, mb, mc]).run(_.inert, function(err) {
+		M.Async.sequence_([ma, mb, mc]).run(_.inert, function(err) {
 			throw new Error('Monad error: ' + err);
 		});
 
@@ -193,7 +215,7 @@ module.exports = {
 		mb = M.result(2);
 		mc = M.result(3);
 
-		M.sequence([ma, mb, mc]).mmap(function(xs) {
+		M.Async.sequence([ma, mb, mc]).mmap(function(xs) {
 			assert.equal(xs[0], 1);
 			assert.equal(xs[1], 2);
 			assert.equal(xs[2], 3);
