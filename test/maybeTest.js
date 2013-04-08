@@ -48,6 +48,14 @@ module.exports = {
 		assert.equal(M.nothing.or(5), 5);
 	},
 
+	'Maybe.concat() returns an array of the Just values from an array of Maybes': function(_, assert) {
+		var ms = [M.just(1), M.nothing, M.just(4), M.nothing];
+		var xs = M.Maybe.concat(ms);
+
+		assert.equal(xs[0], 1);
+		assert.equal(xs[1], 4);
+	},
+
 	'Either::right().isRight() and Either::left().isLeft()': function(_, assert) {
 		assert.ok(E.right(3).isRight());
 		assert.ok(! E.left('Nope').isRight());
@@ -83,6 +91,5 @@ module.exports = {
 
 		assert.ok(threw, 'threw error for Right');
 	}
-
 
 }
