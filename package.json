@@ -5,6 +5,7 @@
 	"description": "Node.js Asynchronous Monad: Control flow made easy",
 	"keywords": ["functional", "monad", "continuation", "server"],
 	"repository": { "type": "git", "url": "git://github.com/robnormal/nodam.git" },
+  "main": "./lib/nodam.js",
 	"dependencies"  : { "underscore": "", "sqlite3": ""	},
 	"license": "MIT"
 }
